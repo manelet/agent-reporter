@@ -42,8 +42,11 @@ export interface ReportRecord extends BaseRecord {
   params: Record<string, unknown>;
   trigger: Trigger;
   cron: string | null;
-  // The server reports the secret as a sentinel ("set" | "unset"), never the value.
+  // The server reports the secret as a sentinel ("set" | "unset"). The raw
+  // value is only returned when ?reveal=true is passed.
   webhook_secret_status: "set" | "unset";
+  webhook_path?: string;
+  webhook_secret?: string;
   enabled: boolean;
 }
 

@@ -25,73 +25,35 @@ function last24hWindow(now = new Date()): TimeWindow {
   return { from: new Date(now.getTime() - 24 * 60 * 60 * 1000), to: now };
 }
 
-export async function executeReport(
-  reportId: string,
+interface ResolvedReport {
+  id: string;
+  template_id: string;
+  source: string;
+  channels: string[];
+  params: Record<string, unknown>;
+  enabled: boolean;
+}
+
+// Shared post-fetch path: shouldDeliver → render → deliver → save run.
+async function deliverAndRecord(
+  pb: PocketBase,
+  report: ResolvedReport,
   triggerKind: TriggerKind,
-  pbOverride?: PocketBase,
+  startedAt: Date,
+  payload: unknown,
 ): Promise<RunOutcome> {
-  const pb = pbOverride ?? (await getServerPb());
-  const startedAt = new Date();
-
-  const report = await pb.collection("reports").getOne(reportId);
-  if (!report.enabled && triggerKind !== "manual") {
-    throw new Error("report is disabled");
-  }
-
   const baseRun = {
     report: report.id,
     trigger_kind: triggerKind,
     started_at: startedAt.toISOString(),
   };
-
-  // 1. Resolve source + template + channels.
-  const sourceRow = await pb.collection("sources").getOne(report.source);
-  const sourceAdapter = getSourceAdapter(sourceRow.type);
   const template = getTemplate(report.template_id);
-  if (template.sourceType !== sourceAdapter.type) {
-    return await failRun(
-      pb,
-      baseRun,
-      `template "${template.id}" expects source type "${template.sourceType}" but report uses "${sourceAdapter.type}"`,
-    );
-  }
 
-  // 2. Fetch source data (only pull sources are supported here; push runs
-  //    are produced by the webhook endpoint).
-  if (sourceAdapter.mode !== "pull") {
-    return await failRun(
-      pb,
-      baseRun,
-      `source "${sourceAdapter.type}" is push-mode; cannot run on cron/manual trigger`,
-    );
-  }
-
-  let payload: unknown;
-  try {
-    const decrypted = decryptConfig(
-      (sourceRow.config ?? {}) as Record<string, unknown>,
-    );
-    const config = sourceAdapter.configSchema.parse(decrypted);
-    payload = await sourceAdapter.fetch(
-      config,
-      (report.params ?? {}) as Record<string, unknown>,
-      last24hWindow(startedAt),
-    );
-  } catch (e) {
-    return await failRun(
-      pb,
-      baseRun,
-      e instanceof Error ? e.message : String(e),
-    );
-  }
-
-  // 3. Skip if template says no.
   if (!template.shouldDeliver(payload)) {
-    const finishedAt = new Date();
     const created = await pb.collection("runs").create({
       ...baseRun,
       status: "skipped",
-      finished_at: finishedAt.toISOString(),
+      finished_at: new Date().toISOString(),
       payload,
       rendered: null,
       deliveries: [],
@@ -99,15 +61,13 @@ export async function executeReport(
     return { runId: created.id, status: "skipped" };
   }
 
-  // 4. Render once, deliver to each channel.
   const rendered: RenderedContent = {
     email: template.renderEmail(payload),
     telegram: template.renderTelegram(payload),
   };
 
-  const channelIds = (report.channels ?? []) as string[];
   const deliveries: DeliveryResult[] = [];
-  for (const channelId of channelIds) {
+  for (const channelId of report.channels) {
     try {
       const channelRow = await pb.collection("channels").getOne(channelId);
       const channelAdapter = getChannelAdapter(channelRow.type);
@@ -134,11 +94,10 @@ export async function executeReport(
         ? "failed"
         : "partial";
 
-  const finishedAt = new Date();
   const created = await pb.collection("runs").create({
     ...baseRun,
     status,
-    finished_at: finishedAt.toISOString(),
+    finished_at: new Date().toISOString(),
     payload,
     rendered,
     deliveries,
@@ -148,16 +107,98 @@ export async function executeReport(
 
 async function failRun(
   pb: PocketBase,
-  base: Record<string, unknown>,
+  reportId: string,
+  triggerKind: TriggerKind,
+  startedAt: Date,
   error: string,
 ): Promise<RunOutcome> {
-  const finishedAt = new Date();
   const created = await pb.collection("runs").create({
-    ...base,
+    report: reportId,
+    trigger_kind: triggerKind,
+    started_at: startedAt.toISOString(),
+    finished_at: new Date().toISOString(),
     status: "failed",
-    finished_at: finishedAt.toISOString(),
     deliveries: [],
     error,
   });
   return { runId: created.id, status: "failed" };
+}
+
+// Pull flow: cron or manual. Fetches from the source then delivers.
+export async function executeReport(
+  reportId: string,
+  triggerKind: "cron" | "manual",
+  pbOverride?: PocketBase,
+): Promise<RunOutcome> {
+  const pb = pbOverride ?? (await getServerPb());
+  const startedAt = new Date();
+
+  const report = (await pb
+    .collection("reports")
+    .getOne(reportId)) as unknown as ResolvedReport & { trigger: string };
+  if (!report.enabled && triggerKind !== "manual") {
+    throw new Error("report is disabled");
+  }
+
+  const sourceRow = await pb.collection("sources").getOne(report.source);
+  const sourceAdapter = getSourceAdapter(sourceRow.type);
+  const template = getTemplate(report.template_id);
+  if (template.sourceType !== sourceAdapter.type) {
+    return failRun(
+      pb,
+      report.id,
+      triggerKind,
+      startedAt,
+      `template "${template.id}" expects source type "${template.sourceType}" but report uses "${sourceAdapter.type}"`,
+    );
+  }
+  if (sourceAdapter.mode !== "pull") {
+    return failRun(
+      pb,
+      report.id,
+      triggerKind,
+      startedAt,
+      `source "${sourceAdapter.type}" is push-mode; cannot run on cron/manual trigger`,
+    );
+  }
+
+  let payload: unknown;
+  try {
+    const decrypted = decryptConfig(
+      (sourceRow.config ?? {}) as Record<string, unknown>,
+    );
+    const config = sourceAdapter.configSchema.parse(decrypted);
+    payload = await sourceAdapter.fetch(
+      config,
+      (report.params ?? {}) as Record<string, unknown>,
+      last24hWindow(startedAt),
+    );
+  } catch (e) {
+    return failRun(
+      pb,
+      report.id,
+      triggerKind,
+      startedAt,
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  return deliverAndRecord(pb, report, triggerKind, startedAt, payload);
+}
+
+// Push flow: webhook endpoint already verified the signature and parsed
+// the payload through the source adapter. We just need to deliver.
+export async function executeWebhookReport(
+  reportId: string,
+  payload: unknown,
+  pbOverride?: PocketBase,
+): Promise<RunOutcome> {
+  const pb = pbOverride ?? (await getServerPb());
+  const startedAt = new Date();
+
+  const report = (await pb
+    .collection("reports")
+    .getOne(reportId)) as unknown as ResolvedReport;
+
+  return deliverAndRecord(pb, report, "webhook", startedAt, payload);
 }

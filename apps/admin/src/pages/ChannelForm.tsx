@@ -6,14 +6,9 @@ import { Button, Field, Select, TextInput } from "../components/Field.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { api } from "../lib/api.js";
 
-interface TelegramConfig {
-  bot_token: string;
-  chat_id: string;
-}
-
 const supportedTypes: { value: ChannelType; label: string }[] = [
   { value: "telegram", label: "Telegram" },
-  // email comes in M3.
+  { value: "email", label: "Email (Resend)" },
 ];
 
 export function ChannelFormPage() {
@@ -24,8 +19,12 @@ export function ChannelFormPage() {
 
   const [name, setName] = useState("");
   const [type, setType] = useState<ChannelType>("telegram");
-  const [botToken, setBotToken] = useState("");
-  const [chatId, setChatId] = useState("");
+  const [tg, setTg] = useState({ bot_token: "", chat_id: "" });
+  const [email, setEmail] = useState({
+    api_key: "",
+    from_address: "",
+    to_addresses: "",
+  });
   const [err, setErr] = useState<string | null>(null);
 
   const existing = useQuery({
@@ -39,18 +38,41 @@ export function ChannelFormPage() {
     if (!existing.data) return;
     setName(existing.data.name);
     setType(existing.data.type);
-    const cfg = existing.data.config as Partial<TelegramConfig>;
-    setBotToken(cfg.bot_token ?? "");
-    setChatId(cfg.chat_id ?? "");
+    const cfg = existing.data.config as Record<string, unknown>;
+    if (existing.data.type === "telegram") {
+      setTg({
+        bot_token: String(cfg.bot_token ?? ""),
+        chat_id: String(cfg.chat_id ?? ""),
+      });
+    } else if (existing.data.type === "email") {
+      const recipients = Array.isArray(cfg.to_addresses)
+        ? (cfg.to_addresses as string[]).join(", ")
+        : "";
+      setEmail({
+        api_key: String(cfg.api_key ?? ""),
+        from_address: String(cfg.from_address ?? ""),
+        to_addresses: recipients,
+      });
+    }
   }, [existing.data]);
 
   const save = useMutation({
     mutationFn: async () => {
-      const body = {
-        name,
-        type,
-        config: { bot_token: botToken, chat_id: chatId },
-      };
+      let configPayload: Record<string, unknown>;
+      if (type === "telegram") {
+        configPayload = { bot_token: tg.bot_token, chat_id: tg.chat_id };
+      } else {
+        const recipients = email.to_addresses
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        configPayload = {
+          api_key: email.api_key,
+          from_address: email.from_address,
+          to_addresses: recipients,
+        };
+      }
+      const body = { name, type, config: configPayload };
       if (isEdit) {
         await api.patch(`/api/channels/${id}`, body);
         return id;
@@ -109,16 +131,15 @@ export function ChannelFormPage() {
 
         {type === "telegram" ? (
           <>
-            <Field
-              label="Bot token"
-              hint="From @BotFather. Encrypted at rest."
-            >
+            <Field label="Bot token" hint="From @BotFather. Encrypted at rest.">
               <TextInput
                 type="password"
-                required
-                value={botToken}
-                onChange={(e) => setBotToken(e.target.value)}
-                placeholder="123456:ABC-DEF..."
+                required={!isEdit}
+                value={tg.bot_token}
+                onChange={(e) =>
+                  setTg((p) => ({ ...p, bot_token: e.target.value }))
+                }
+                placeholder={isEdit ? "•••••• (leave blank to keep)" : "123:ABC"}
               />
             </Field>
             <Field
@@ -127,9 +148,57 @@ export function ChannelFormPage() {
             >
               <TextInput
                 required
-                value={chatId}
-                onChange={(e) => setChatId(e.target.value)}
+                value={tg.chat_id}
+                onChange={(e) =>
+                  setTg((p) => ({ ...p, chat_id: e.target.value }))
+                }
                 placeholder="123456789"
+              />
+            </Field>
+          </>
+        ) : null}
+
+        {type === "email" ? (
+          <>
+            <Field
+              label="Resend API key"
+              hint="https://resend.com/api-keys. Encrypted at rest."
+            >
+              <TextInput
+                type="password"
+                required={!isEdit}
+                value={email.api_key}
+                onChange={(e) =>
+                  setEmail((p) => ({ ...p, api_key: e.target.value }))
+                }
+                placeholder={isEdit ? "•••••• (leave blank to keep)" : "re_..."}
+              />
+            </Field>
+            <Field
+              label="From address"
+              hint="Must match a verified domain in Resend."
+            >
+              <TextInput
+                type="email"
+                required
+                value={email.from_address}
+                onChange={(e) =>
+                  setEmail((p) => ({ ...p, from_address: e.target.value }))
+                }
+                placeholder="reports@yourdomain.com"
+              />
+            </Field>
+            <Field
+              label="Recipients"
+              hint="Comma-separated list of email addresses."
+            >
+              <TextInput
+                required
+                value={email.to_addresses}
+                onChange={(e) =>
+                  setEmail((p) => ({ ...p, to_addresses: e.target.value }))
+                }
+                placeholder="me@example.com, ops@example.com"
               />
             </Field>
           </>

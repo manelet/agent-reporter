@@ -10,6 +10,7 @@ import { reportsRoutes } from "./api/reports.js";
 import { runsRoutes } from "./api/runs.js";
 import { sourcesRoutes } from "./api/sources.js";
 import { templatesRoutes } from "./api/templates.js";
+import { webhooksRoutes } from "./api/webhooks.js";
 import { initScheduler } from "./scheduler.js";
 
 const app = new Hono();
@@ -26,6 +27,10 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+// Public webhooks: no auth middleware; HMAC is verified per-source inside
+// the handler using the report's own secret.
+app.route("/webhooks", webhooksRoutes);
 
 app.route("/api/auth", authRoutes);
 

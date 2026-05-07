@@ -6,16 +6,13 @@ import { Button, Field, Select, TextInput } from "../components/Field.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { api } from "../lib/api.js";
 
-interface CustomApiConfig {
-  url: string;
-  bearer_token?: string;
-  timeout_ms?: number;
-}
-
 const supportedTypes: { value: SourceType; label: string }[] = [
-  { value: "custom-api", label: "Custom API" },
-  // Future types appear here as they are implemented.
+  { value: "custom-api", label: "Custom API (pull)" },
+  { value: "github-actions", label: "GitHub Actions (push)" },
+  { value: "sentry", label: "Sentry (pull)" },
 ];
+
+type AnyConfig = Record<string, string>;
 
 export function SourceFormPage() {
   const { id } = useParams();
@@ -25,9 +22,7 @@ export function SourceFormPage() {
 
   const [name, setName] = useState("");
   const [type, setType] = useState<SourceType>("custom-api");
-  const [url, setUrl] = useState("");
-  const [bearer, setBearer] = useState("");
-  const [revealed, setRevealed] = useState(false);
+  const [config, setConfig] = useState<AnyConfig>({});
   const [err, setErr] = useState<string | null>(null);
 
   const existing = useQuery({
@@ -41,17 +36,23 @@ export function SourceFormPage() {
     if (!existing.data) return;
     setName(existing.data.name);
     setType(existing.data.type);
-    const cfg = existing.data.config as Partial<CustomApiConfig>;
-    setUrl(cfg.url ?? "");
-    setBearer(cfg.bearer_token ?? "");
-    setRevealed(true);
+    const cfg: AnyConfig = {};
+    for (const [k, v] of Object.entries(existing.data.config)) {
+      cfg[k] = typeof v === "string" ? v : String(v ?? "");
+    }
+    setConfig(cfg);
   }, [existing.data]);
+
+  const setField = (k: string, v: string) =>
+    setConfig((prev) => ({ ...prev, [k]: v }));
 
   const save = useMutation({
     mutationFn: async () => {
-      const config: CustomApiConfig = { url };
-      if (bearer) config.bearer_token = bearer;
-      const body = { name, type, config };
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(config)) {
+        if (v.trim().length > 0) cleaned[k] = v;
+      }
+      const body = { name, type, config: cleaned };
       if (isEdit) {
         await api.patch(`/api/sources/${id}`, body);
         return id;
@@ -98,7 +99,10 @@ export function SourceFormPage() {
         <Field label="Type">
           <Select
             value={type}
-            onChange={(e) => setType(e.target.value as SourceType)}
+            onChange={(e) => {
+              setType(e.target.value as SourceType);
+              setConfig({});
+            }}
           >
             {supportedTypes.map((t) => (
               <option key={t.value} value={t.value}>
@@ -117,8 +121,8 @@ export function SourceFormPage() {
               <TextInput
                 type="url"
                 required
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                value={config.url ?? ""}
+                onChange={(e) => setField("url", e.target.value)}
                 placeholder="https://api.example.com/daily-report"
               />
             </Field>
@@ -127,12 +131,84 @@ export function SourceFormPage() {
               hint="Encrypted at rest with AES-256-GCM."
             >
               <TextInput
-                type={revealed ? "text" : "password"}
-                value={bearer}
-                onChange={(e) => setBearer(e.target.value)}
-                placeholder={
-                  isEdit && !revealed ? "•••••• (current value hidden)" : ""
-                }
+                type="password"
+                value={config.bearer_token ?? ""}
+                onChange={(e) => setField("bearer_token", e.target.value)}
+                placeholder={isEdit ? "•••••• (leave blank to keep)" : ""}
+              />
+            </Field>
+          </>
+        ) : null}
+
+        {type === "github-actions" ? (
+          <>
+            <Field
+              label="Repository"
+              hint="owner/name. Webhooks from other repos are ignored."
+            >
+              <TextInput
+                required
+                value={config.repo ?? ""}
+                onChange={(e) => setField("repo", e.target.value)}
+                placeholder="acme/web"
+              />
+            </Field>
+            <Field
+              label="Workflow name (optional)"
+              hint="If set, only this workflow's runs will be considered."
+            >
+              <TextInput
+                value={config.workflow_name ?? ""}
+                onChange={(e) => setField("workflow_name", e.target.value)}
+                placeholder="CI"
+              />
+            </Field>
+            <p className="text-xs text-zinc-500">
+              The webhook URL and HMAC secret live on the report (auto-generated
+              when you set its trigger to webhook).
+            </p>
+          </>
+        ) : null}
+
+        {type === "sentry" ? (
+          <>
+            <Field
+              label="Auth token"
+              hint="Personal or internal-integration token with event:read + project:read."
+            >
+              <TextInput
+                type="password"
+                required={!isEdit}
+                value={config.token ?? ""}
+                onChange={(e) => setField("token", e.target.value)}
+                placeholder={isEdit ? "•••••• (leave blank to keep)" : ""}
+              />
+            </Field>
+            <Field label="Organization slug">
+              <TextInput
+                required
+                value={config.organization_slug ?? ""}
+                onChange={(e) => setField("organization_slug", e.target.value)}
+                placeholder="acme"
+              />
+            </Field>
+            <Field label="Project slug">
+              <TextInput
+                required
+                value={config.project_slug ?? ""}
+                onChange={(e) => setField("project_slug", e.target.value)}
+                placeholder="web"
+              />
+            </Field>
+            <Field
+              label="Base URL (optional)"
+              hint="Defaults to https://sentry.io. Override for self-hosted."
+            >
+              <TextInput
+                type="url"
+                value={config.base_url ?? ""}
+                onChange={(e) => setField("base_url", e.target.value)}
+                placeholder="https://sentry.io"
               />
             </Field>
           </>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   ChannelRecord,
@@ -51,8 +51,9 @@ export function ReportFormPage() {
     queryFn: () => api.get<TemplateMeta[]>("/api/templates"),
   });
   const existing = useQuery({
-    queryKey: ["report", id],
-    queryFn: () => api.get<ReportRecord>(`/api/reports/${id}`),
+    queryKey: ["report", id, "with-secret"],
+    queryFn: () =>
+      api.get<ReportRecord>(`/api/reports/${id}?reveal=true`),
     enabled: isEdit,
   });
 
@@ -67,18 +68,21 @@ export function ReportFormPage() {
     setEnabled(existing.data.enabled);
   }, [existing.data]);
 
-  // When the source changes, default trigger to webhook for push types and
-  // narrow templates to those compatible with the source type.
   const selectedSource = sources.data?.find((s) => s.id === sourceId);
   const sourceType = selectedSource?.type;
-  const compatibleTemplates =
-    templates.data?.filter((t) => !sourceType || t.sourceType === sourceType) ??
-    [];
+  const isPush = isPushSource(sourceType);
+
+  const compatibleTemplates = useMemo(
+    () =>
+      templates.data?.filter(
+        (t) => !sourceType || t.sourceType === sourceType,
+      ) ?? [],
+    [templates.data, sourceType],
+  );
 
   useEffect(() => {
     if (!sourceType) return;
     setTrigger(isPushSource(sourceType) ? "webhook" : "cron");
-    // Reset template if the current one is incompatible.
     if (
       templateId &&
       templates.data &&
@@ -123,13 +127,22 @@ export function ReportFormPage() {
     },
   });
 
+  const regenerate = useMutation({
+    mutationFn: () =>
+      api.post<{ webhook_secret: string }>(
+        `/api/reports/${id}/regenerate-secret`,
+        {},
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["report", id, "with-secret"] });
+    },
+  });
+
   const toggleChannel = (chId: string) => {
     setChannelIds((prev) =>
       prev.includes(chId) ? prev.filter((x) => x !== chId) : [...prev, chId],
     );
   };
-
-  const isPush = isPushSource(sourceType);
 
   return (
     <div className="max-w-xl">
@@ -244,6 +257,51 @@ export function ReportFormPage() {
               placeholder="0 9 * * *"
             />
           </Field>
+        ) : null}
+
+        {trigger === "webhook" && isEdit && existing.data ? (
+          <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900/40 p-3">
+            <p className="text-xs font-medium text-zinc-300">Webhook setup</p>
+            <p className="text-xs text-zinc-500">
+              In GitHub: Settings → Webhooks → Add webhook. Use Content type{" "}
+              <code className="text-zinc-300">application/json</code> and send
+              the <code className="text-zinc-300">workflow_run</code> event.
+            </p>
+            <Field label="Payload URL (path)">
+              <TextInput
+                readOnly
+                value={existing.data.webhook_path ?? ""}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </Field>
+            <Field
+              label="Secret"
+              hint="Paste this into GitHub's webhook secret field. Regenerate to rotate."
+            >
+              <div className="flex gap-2">
+                <TextInput
+                  readOnly
+                  value={existing.data.webhook_secret ?? ""}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="font-mono"
+                />
+                <Button
+                  type="button"
+                  onClick={() => regenerate.mutate()}
+                  disabled={regenerate.isPending}
+                >
+                  {regenerate.isPending ? "…" : "Regenerate"}
+                </Button>
+              </div>
+            </Field>
+          </div>
+        ) : null}
+
+        {trigger === "webhook" && !isEdit ? (
+          <p className="text-xs text-zinc-500">
+            A webhook URL and HMAC secret will be generated when you save this
+            report.
+          </p>
         ) : null}
 
         <label className="flex items-center gap-2 text-sm">

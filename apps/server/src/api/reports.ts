@@ -5,14 +5,18 @@ import {
   reportCreateSchema,
   reportUpdateSchema,
 } from "@agent-reporter/shared";
-import { encrypt } from "../crypto.js";
+import { decrypt, encrypt } from "../crypto.js";
 import { executeReport } from "../runner.js";
 import { reloadSchedules } from "../scheduler.js";
 
 const COLLECTION = "reports";
 
-function shapeReport(row: Record<string, unknown>) {
-  return {
+interface ShapeOpts {
+  revealSecret?: boolean;
+}
+
+function shapeReport(row: Record<string, unknown>, opts: ShapeOpts = {}) {
+  const out: Record<string, unknown> = {
     id: row.id,
     name: row.name,
     source: row.source,
@@ -26,6 +30,16 @@ function shapeReport(row: Record<string, unknown>) {
     created: row.created,
     updated: row.updated,
   };
+  // The webhook URL is path-only; the admin (and the user setting up GH)
+  // prepends the public host. We can't know it server-side without an env
+  // var the user must keep in sync.
+  if (row.trigger === "webhook") {
+    out.webhook_path = `/webhooks/${row.id}`;
+    if (opts.revealSecret && typeof row.webhook_secret === "string") {
+      out.webhook_secret = decrypt(row.webhook_secret);
+    }
+  }
+  return out;
 }
 
 export const reportsRoutes = new Hono()
@@ -39,8 +53,9 @@ export const reportsRoutes = new Hono()
   .get("/:id", async (c) => {
     const pb = c.get("pb");
     const id = c.req.param("id");
+    const reveal = c.req.query("reveal") === "true";
     const row = await pb.collection(COLLECTION).getOne(id);
-    return c.json(shapeReport(row as never));
+    return c.json(shapeReport(row as never, { revealSecret: reveal }));
   })
   .post("/", async (c) => {
     const pb = c.get("pb");
@@ -86,6 +101,14 @@ export const reportsRoutes = new Hono()
     }
     const patch: Record<string, unknown> = { ...parsed.data };
     if ("cron" in patch && patch.cron === undefined) patch.cron = "";
+    // Switching trigger to webhook on a report that didn't have one needs a
+    // freshly generated secret.
+    if (patch.trigger === "webhook") {
+      const current = await pb.collection(COLLECTION).getOne(id);
+      if (!current.webhook_secret) {
+        patch.webhook_secret = encrypt(randomBytes(32).toString("hex"));
+      }
+    }
     await pb.collection(COLLECTION).update(id, patch);
     void reloadSchedules().catch((e: unknown) => {
       console.error("[reports] reloadSchedules failed", e);
@@ -100,6 +123,15 @@ export const reportsRoutes = new Hono()
       console.error("[reports] reloadSchedules failed", e);
     });
     return c.json({ ok: true });
+  })
+  .post("/:id/regenerate-secret", async (c) => {
+    const pb = c.get("pb");
+    const id = c.req.param("id");
+    const newSecret = randomBytes(32).toString("hex");
+    await pb
+      .collection(COLLECTION)
+      .update(id, { webhook_secret: encrypt(newSecret) });
+    return c.json({ webhook_secret: newSecret });
   })
   .post("/:id/run", async (c) => {
     const id = c.req.param("id");
