@@ -14,9 +14,13 @@ const envSchema = z.object({
   PB_URL: z.string().url().default("http://127.0.0.1:8090"),
   PB_ADMIN_EMAIL: z.string().email(),
   PB_ADMIN_PASSWORD: z.string().min(1),
-  SERVER_PORT: z.coerce.number().int().positive().default(3000),
+  // Listen port. portless injects PORT (random 4000-4999); without portless
+  // we fall back to 3000.
+  PORT: z.coerce.number().int().positive().default(3000),
   SERVER_HOST: z.string().default("127.0.0.1"),
-  ADMIN_ORIGIN: z.string().url().default("http://127.0.0.1:5173"),
+  // Origin allowed by CORS. With portless this is the admin's stable URL;
+  // override to http://127.0.0.1:5173 if running Vite without portless.
+  ADMIN_ORIGIN: z.string().url().default("https://agent-reporter.localhost"),
   CRON_TIMEZONE: z.string().default("Europe/Madrid"),
 });
 

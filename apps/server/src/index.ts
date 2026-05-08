@@ -52,7 +52,7 @@ app.onError((err, c) => {
 });
 
 serve(
-  { fetch: app.fetch, port: env.SERVER_PORT, hostname: env.SERVER_HOST },
+  { fetch: app.fetch, port: env.PORT, hostname: env.SERVER_HOST },
   ({ port, address }) => {
     console.log(`[server] listening on http://${address}:${port}`);
     initScheduler().catch((e) => {
