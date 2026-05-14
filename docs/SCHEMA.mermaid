@@ -1,0 +1,46 @@
+flowchart TD
+    subgraph CREATION["1 · Creation (Admin UI → PocketBase)"]
+        direction LR
+        U[User<br/>admin app] --> S[(Sources<br/>custom-api · github-actions · sentry<br/>config encrypted)]
+        U --> C[(Channels<br/>telegram · email<br/>config encrypted)]
+        U --> R[(Reports<br/>source + template + channels<br/>trigger: cron · webhook<br/>webhook_secret encrypted)]
+        R -. references .-> S
+        R -. references .-> C
+    end
+
+    subgraph TRIGGERS["2 · Triggers"]
+        direction LR
+        CRON[["node-cron tasks<br/>scheduler.ts"]]
+        MAN[["Manual run<br/>POST /api/runs/:reportId/execute"]]
+        WH[["POST /webhooks/:reportId<br/>HMAC verified per-source<br/>parseWebhook → payload | null"]]
+    end
+
+    R -->|enabled + cron| CRON
+    CRON --> ER[executeReport<br/>pull flow]
+    MAN --> ER
+    WH --> EW[executeWebhookReport<br/>push flow]
+
+    subgraph PULL["Pull flow (runner.ts)"]
+        ER --> CHK{template.sourceType<br/>matches source?<br/>source is pull-mode?}
+        CHK -- no --> FR[(run = failed)]
+        CHK -- yes --> FETCH[sourceAdapter.fetch<br/>config + params + last 24h]
+        FETCH -->|payload| DAR
+        FETCH -- error --> FR
+    end
+
+    EW --> DAR
+
+    subgraph DELIVER["3 · deliverAndRecord (shared)"]
+        DAR{{template.shouldDeliver payload?}}
+        DAR -- no --> SK[(run = skipped)]
+        DAR -- yes --> RND[template.renderEmail<br/>template.renderTelegram]
+        RND --> LOOP{For each channel}
+        LOOP --> CA[channelAdapter.deliver<br/>decrypt config · send]
+        CA -->|ok / failed| AGG[Aggregate deliveries]
+        AGG --> ST{All ok?}
+        ST -->|all| OK[(run = success)]
+        ST -->|some| PT[(run = partial)]
+        ST -->|none| FA[(run = failed)]
+    end
+
+    OK & PT & FA & SK & FR --> RUNS[(runs collection<br/>payload · rendered · deliveries · status)]
