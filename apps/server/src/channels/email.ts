@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { z } from "zod";
+import { renderEmail } from "./render.js";
 import type { ChannelAdapter } from "./types.js";
 
 const emailConfigSchema = z.object({
@@ -34,11 +35,9 @@ export const emailChannel: ChannelAdapter<EmailConfig> = {
   type: "email",
   configSchema: emailConfigSchema,
 
-  async deliver(config, content) {
-    if (!content.email) {
-      throw new Error("template did not render email content");
-    }
-    await send(config, content.email.subject, content.email.html);
+  async deliver(config, notification) {
+    const { subject, html } = renderEmail(notification);
+    await send(config, subject, html);
   },
 
   async testDelivery(config) {

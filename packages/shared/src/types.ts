@@ -1,6 +1,8 @@
 // DB row shapes (what the API returns to the admin).
 // Inputs (create/update) live as zod schemas in schemas.ts.
 
+import type { Notification } from "./notification.js";
+
 export interface BaseRecord {
   id: string;
   created: string;
@@ -11,7 +13,8 @@ export type SourceType =
   | "sentry"
   | "mixpanel"
   | "github-actions"
-  | "custom-api";
+  | "custom-api"
+  | "notification-webhook";
 
 export type ChannelType = "email" | "telegram";
 
@@ -19,7 +22,7 @@ export type Trigger = "cron" | "webhook";
 
 export type RunStatusValue = "success" | "partial" | "skipped" | "failed";
 
-export type TriggerKindValue = "cron" | "webhook" | "manual";
+export type TriggerKindValue = "cron" | "webhook" | "manual" | "api";
 
 export interface SourceRecord extends BaseRecord {
   name: string;
@@ -38,7 +41,8 @@ export interface ReportRecord extends BaseRecord {
   name: string;
   source: string;
   channels: string[];
-  template_id: string;
+  // Nullable: only required when the source does not emit Notification directly.
+  template_id: string | null;
   params: Record<string, unknown>;
   trigger: Trigger;
   cron: string | null;
@@ -51,19 +55,26 @@ export interface ReportRecord extends BaseRecord {
 }
 
 export interface RunRecord extends BaseRecord {
-  report: string;
+  // Nullable: runs from POST /api/notify have no parent report.
+  report: string | null;
   status: RunStatusValue;
   trigger_kind: TriggerKindValue;
   started_at: string | null;
   finished_at: string | null;
   payload: unknown;
-  rendered:
-    | { email?: { subject: string; html: string }; telegram?: string }
-    | null;
+  notification: Notification | null;
   deliveries: Array<{
     channel_id: string;
     status: "ok" | "failed";
     error?: string;
   }>;
   error: string | null;
+}
+
+export interface ApiKeyRecord extends BaseRecord {
+  name: string;
+  // Hash only; plaintext is shown once on creation and never persisted.
+  token_hash: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
 }

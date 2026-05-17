@@ -67,6 +67,7 @@ async function fetchIssues(
 export const sentrySource: PullSourceAdapter<SentryConfig, SentryDailyData> = {
   type: "sentry",
   mode: "pull",
+  emitsNotification: false,
   configSchema: sentryConfigSchema,
 
   async fetch(config, _params, window) {

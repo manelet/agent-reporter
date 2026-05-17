@@ -3,15 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "pnpm --parallel -r dev",
-    "dev:pb": "./pocketbase serve --http=127.0.0.1:8090",
+    "dev": "concurrently -k -n pb,apps \"pnpm dev:pb\" \"wait-on tcp:127.0.0.1:8090 && pnpm --parallel -r dev\"",
+    "dev:pb": "pocketbase serve --http=127.0.0.1:8090",
     "dev:server": "pnpm --filter @agent-reporter/server dev",
     "dev:admin": "pnpm --filter @agent-reporter/admin dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "concurrently": "^9.2.1",
+    "typescript": "^5.6.3",
+    "wait-on": "^9.0.10"
   },
   "packageManager": "pnpm@10.30.3",
   "engines": {

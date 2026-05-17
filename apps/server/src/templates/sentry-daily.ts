@@ -1,28 +1,16 @@
+import type { Notification } from "@agent-reporter/shared";
 import type { SentryDailyData, SentryIssue } from "../sources/sentry.js";
 import type { ReportTemplate } from "./types.js";
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function issueHtml(i: SentryIssue): string {
-  return `<li>
-  <a href="${escapeHtml(i.permalink)}" style="font-weight:600">${escapeHtml(i.shortId)}</a>
-  <span style="color:#888">·</span> ${escapeHtml(i.title)}
-  <div style="font-size:.85em;color:#666">${escapeHtml(i.level)} · ${i.count} events${
-    i.userCount !== undefined ? ` · ${i.userCount} users` : ""
-  }${i.culprit ? ` · ${escapeHtml(i.culprit)}` : ""}</div>
-</li>`;
-}
-
-function issueText(i: SentryIssue): string {
-  const culprit = i.culprit ? ` — ${i.culprit}` : "";
-  return `• [${i.level}] ${i.shortId} · ${i.title}${culprit} (${i.count} events)\n  ${i.permalink}`;
+function issueItem(i: SentryIssue) {
+  const events =
+    typeof i.count === "string" ? i.count : `${i.count} events`;
+  const users = i.userCount !== undefined ? ` · ${i.userCount} users` : "";
+  return {
+    label: `${i.shortId} · ${i.title}`,
+    value: `${i.level} · ${events}${users}`,
+    url: i.permalink,
+  };
 }
 
 export const sentryDaily: ReportTemplate<SentryDailyData> = {
@@ -77,37 +65,25 @@ export const sentryDaily: ReportTemplate<SentryDailyData> = {
     };
   },
 
-  renderEmail(data) {
-    const heading = (label: string, count: number) =>
-      `<h3 style="margin:1.25rem 0 .25rem">${escapeHtml(label)} <span style="color:#888;font-weight:normal">(${count})</span></h3>`;
-    const list = (issues: SentryIssue[]) =>
-      issues.length
-        ? `<ul style="padding-left:1.25rem;margin:0">${issues.map(issueHtml).join("")}</ul>`
-        : `<p style="color:#888;margin:0">None.</p>`;
-
-    const subject = `[Sentry ${data.organization}/${data.project}] ${data.new_issues.length} new, ${data.regressed_issues.length} regressed`;
-    const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;max-width:680px;margin:0 auto;padding:1rem;color:#222">
-<h1 style="font-size:1.25rem;margin:0 0 .5rem">${escapeHtml(data.organization)} / ${escapeHtml(data.project)}</h1>
-<p style="color:#666;font-size:.9em;margin:0 0 1rem">Window: ${escapeHtml(data.window.from)} → ${escapeHtml(data.window.to)}</p>
-${heading("New issues", data.new_issues.length)}${list(data.new_issues)}
-${heading("Regressed", data.regressed_issues.length)}${list(data.regressed_issues)}
-</body></html>`;
-    return { subject, html };
-  },
-
-  renderTelegram(data) {
-    const lines: string[] = [
-      `Sentry · ${data.organization}/${data.project}`,
-      `${data.new_issues.length} new, ${data.regressed_issues.length} regressed`,
-    ];
-    if (data.new_issues.length) {
-      lines.push("", "New:");
-      for (const i of data.new_issues) lines.push(issueText(i));
-    }
-    if (data.regressed_issues.length) {
-      lines.push("", "Regressed:");
-      for (const i of data.regressed_issues) lines.push(issueText(i));
-    }
-    return lines.join("\n");
+  render(data): Notification {
+    const total = data.new_issues.length + data.regressed_issues.length;
+    return {
+      title: `Sentry ${data.organization}/${data.project}: ${data.new_issues.length} new, ${data.regressed_issues.length} regressed`,
+      level: total > 0 ? "error" : "info",
+      sections: [
+        {
+          heading: `New issues (${data.new_issues.length})`,
+          items: data.new_issues.map(issueItem),
+        },
+        {
+          heading: `Regressed (${data.regressed_issues.length})`,
+          items: data.regressed_issues.map(issueItem),
+        },
+      ],
+      metadata: [
+        { key: "Window from", value: data.window.from },
+        { key: "Window to", value: data.window.to },
+      ],
+    };
   },
 };

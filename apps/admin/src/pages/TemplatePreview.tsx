@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import type { Notification } from "@agent-reporter/shared";
 import { PageHeader } from "../components/PageHeader.js";
 import { api } from "../lib/api.js";
 
 interface PreviewResponse {
   data: unknown;
   shouldDeliver: boolean;
-  email: { subject: string; html: string };
-  telegram: string;
+  notification: Notification | null;
+  email: { subject: string; html: string } | null;
+  telegram: string | null;
 }
 
 export function TemplatePreviewPage() {
@@ -39,7 +41,7 @@ export function TemplatePreviewPage() {
       ) : (
         <div className="space-y-6">
           <p className="text-xs text-zinc-400">
-            Renderered with mock data.{" "}
+            Rendered with mock data.{" "}
             <span
               className={
                 q.data.shouldDeliver
@@ -51,25 +53,40 @@ export function TemplatePreviewPage() {
             </span>
           </p>
 
-          <section>
-            <h2 className="mb-2 text-sm font-semibold text-zinc-300">
-              Email · {q.data.email.subject}
-            </h2>
-            <iframe
-              title="email-preview"
-              srcDoc={q.data.email.html}
-              className="h-96 w-full rounded border border-zinc-800 bg-white"
-            />
-          </section>
+          {q.data.notification ? (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                Notification
+              </h2>
+              <pre className="max-h-72 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-200">
+                {JSON.stringify(q.data.notification, null, 2)}
+              </pre>
+            </section>
+          ) : null}
 
-          <section>
-            <h2 className="mb-2 text-sm font-semibold text-zinc-300">
-              Telegram
-            </h2>
-            <pre className="whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-200">
-              {q.data.telegram}
-            </pre>
-          </section>
+          {q.data.email ? (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                Email · {q.data.email.subject}
+              </h2>
+              <iframe
+                title="email-preview"
+                srcDoc={q.data.email.html}
+                className="h-96 w-full rounded border border-zinc-800 bg-white"
+              />
+            </section>
+          ) : null}
+
+          {q.data.telegram ? (
+            <section>
+              <h2 className="mb-2 text-sm font-semibold text-zinc-300">
+                Telegram
+              </h2>
+              <pre className="whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-200">
+                {q.data.telegram}
+              </pre>
+            </section>
+          ) : null}
 
           <section>
             <h2 className="mb-2 text-sm font-semibold text-zinc-300">

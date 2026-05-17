@@ -9,10 +9,18 @@ export interface TimeWindow {
 // keep the input side loose (`unknown`) and pin only the parsed output.
 export type ConfigSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
 
-export interface PullSourceAdapter<TConfig = unknown, TData = unknown> {
+interface SourceAdapterBase<TConfig> {
   type: string;
-  mode: "pull";
   configSchema: ConfigSchema<TConfig>;
+  // `true` means fetch/parseWebhook returns a Notification directly; reports
+  // built on this source must not have a template. `false` means the
+  // returned shape is template-specific and a template is required.
+  emitsNotification: boolean;
+}
+
+export interface PullSourceAdapter<TConfig = unknown, TData = unknown>
+  extends SourceAdapterBase<TConfig> {
+  mode: "pull";
   fetch(
     config: TConfig,
     params: Record<string, unknown>,
@@ -21,10 +29,17 @@ export interface PullSourceAdapter<TConfig = unknown, TData = unknown> {
   testConnection(config: TConfig): Promise<{ ok: boolean; error?: string }>;
 }
 
-export interface PushSourceAdapter<TConfig = unknown, TData = unknown> {
-  type: string;
+export interface PushSourceAdapter<TConfig = unknown, TData = unknown>
+  extends SourceAdapterBase<TConfig> {
   mode: "push";
-  configSchema: ConfigSchema<TConfig>;
+  // Verifies the per-report webhook secret against the incoming request.
+  // Different push sources use different signature schemes (e.g. GitHub:
+  // X-Hub-Signature-256; generic: X-Signature-256).
+  verifySignature(
+    headers: Record<string, string>,
+    rawBody: string,
+    secret: string,
+  ): boolean;
   parseWebhook(
     config: TConfig,
     headers: Record<string, string>,

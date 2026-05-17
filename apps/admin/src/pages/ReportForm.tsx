@@ -17,10 +17,10 @@ interface TemplateMeta {
   sourceType: string;
 }
 
-const PUSH_SOURCE_TYPES = new Set(["github-actions"]);
-
-function isPushSource(type: string | undefined): boolean {
-  return type ? PUSH_SOURCE_TYPES.has(type) : false;
+interface SourceTypeMeta {
+  type: string;
+  mode: "pull" | "push";
+  emitsNotification: boolean;
 }
 
 export function ReportFormPage() {
@@ -42,6 +42,10 @@ export function ReportFormPage() {
     queryKey: ["sources"],
     queryFn: () => api.get<SourceRecord[]>("/api/sources"),
   });
+  const sourceTypes = useQuery({
+    queryKey: ["source-types"],
+    queryFn: () => api.get<SourceTypeMeta[]>("/api/sources/types"),
+  });
   const channels = useQuery({
     queryKey: ["channels"],
     queryFn: () => api.get<ChannelRecord[]>("/api/channels"),
@@ -62,15 +66,19 @@ export function ReportFormPage() {
     setName(existing.data.name);
     setSourceId(existing.data.source);
     setChannelIds(existing.data.channels);
-    setTemplateId(existing.data.template_id);
+    setTemplateId(existing.data.template_id ?? "");
     setTrigger(existing.data.trigger);
     setCron(existing.data.cron ?? "");
     setEnabled(existing.data.enabled);
   }, [existing.data]);
 
   const selectedSource = sources.data?.find((s) => s.id === sourceId);
+  const sourceTypeMeta = sourceTypes.data?.find(
+    (t) => t.type === selectedSource?.type,
+  );
+  const isPush = sourceTypeMeta?.mode === "push";
+  const sourceEmitsNotification = !!sourceTypeMeta?.emitsNotification;
   const sourceType = selectedSource?.type;
-  const isPush = isPushSource(sourceType);
 
   const compatibleTemplates = useMemo(
     () =>
@@ -81,18 +89,23 @@ export function ReportFormPage() {
   );
 
   useEffect(() => {
-    if (!sourceType) return;
-    setTrigger(isPushSource(sourceType) ? "webhook" : "cron");
+    if (!sourceTypeMeta) return;
+    setTrigger(sourceTypeMeta.mode === "push" ? "webhook" : "cron");
+    // Force-clear template if source emits Notification or no longer compatible.
+    if (sourceTypeMeta.emitsNotification) {
+      setTemplateId("");
+      return;
+    }
     if (
       templateId &&
       templates.data &&
       !templates.data.some(
-        (t) => t.id === templateId && t.sourceType === sourceType,
+        (t) => t.id === templateId && t.sourceType === sourceTypeMeta.type,
       )
     ) {
       setTemplateId("");
     }
-  }, [sourceType, templates.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sourceTypeMeta, templates.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = useMutation({
     mutationFn: async () => {
@@ -100,7 +113,11 @@ export function ReportFormPage() {
         name,
         source: sourceId,
         channels: channelIds,
-        template_id: templateId,
+        // null tells the server to clear it; "" would also work but we
+        // prefer the more explicit null in JSON.
+        template_id: sourceEmitsNotification
+          ? null
+          : templateId || null,
         trigger,
         enabled,
       };
@@ -212,20 +229,26 @@ export function ReportFormPage() {
           </div>
         </Field>
 
-        <Field label="Template">
-          <Select
-            required
-            value={templateId}
-            onChange={(e) => setTemplateId(e.target.value)}
-          >
-            <option value="">— select —</option>
-            {compatibleTemplates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {sourceEmitsNotification ? (
+          <p className="rounded border border-zinc-800 bg-zinc-900/40 p-3 text-xs text-zinc-400">
+            This source emits a Notification directly. No template is needed.
+          </p>
+        ) : (
+          <Field label="Template">
+            <Select
+              required={!!sourceTypeMeta}
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
+            >
+              <option value="">— select —</option>
+              {compatibleTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         <Field
           label="Trigger"
@@ -263,9 +286,9 @@ export function ReportFormPage() {
           <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900/40 p-3">
             <p className="text-xs font-medium text-zinc-300">Webhook setup</p>
             <p className="text-xs text-zinc-500">
-              In GitHub: Settings → Webhooks → Add webhook. Use Content type{" "}
-              <code className="text-zinc-300">application/json</code> and send
-              the <code className="text-zinc-300">workflow_run</code> event.
+              {sourceType === "github-actions"
+                ? "In GitHub: Settings → Webhooks → Add webhook. Content type application/json, workflow_run event."
+                : "POST a Notification JSON body to this URL with header X-Signature-256: sha256=<hmac-sha256-of-body>."}
             </p>
             <Field label="Payload URL (path)">
               <TextInput
@@ -276,7 +299,7 @@ export function ReportFormPage() {
             </Field>
             <Field
               label="Secret"
-              hint="Paste this into GitHub's webhook secret field. Regenerate to rotate."
+              hint="Used to sign the webhook body. Regenerate to rotate."
             >
               <div className="flex gap-2">
                 <TextInput

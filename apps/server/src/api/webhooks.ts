@@ -2,10 +2,7 @@ import { Hono } from "hono";
 import { decrypt, decryptConfig } from "../crypto.js";
 import { getServerPb } from "../pb.js";
 import { executeWebhookReport } from "../runner.js";
-import {
-  getSourceAdapter,
-  verifyGithubSignature,
-} from "../sources/index.js";
+import { getSourceAdapter } from "../sources/index.js";
 import type { PushSourceAdapter } from "../sources/types.js";
 
 // Public, unauthenticated. Each report exposes its own URL with a
@@ -50,31 +47,19 @@ export const webhooksRoutes = new Hono().post("/:reportId", async (c) => {
     return c.json({ error: "source is not push-mode" }, 400);
   }
 
-  // Per-source HMAC verification. Each push source decides which header to
-  // check (e.g. github-actions uses X-Hub-Signature-256). For now we
-  // hardcode github's scheme; when we add more push sources, we can route
-  // to a per-adapter `verifySignature` method.
+  const pushAdapter = sourceAdapter as PushSourceAdapter;
   const secret = decrypt(report.webhook_secret);
-  if (sourceRow.type === "github-actions") {
-    const sig = headers["x-hub-signature-256"];
-    if (!verifyGithubSignature(rawBody, sig, secret)) {
-      return c.json({ error: "invalid signature" }, 401);
-    }
-  } else {
-    return c.json({ error: "no signature scheme for source type" }, 500);
+  if (!pushAdapter.verifySignature(headers, rawBody, secret)) {
+    return c.json({ error: "invalid signature" }, 401);
   }
 
-  const config = sourceAdapter.configSchema.parse(
+  const config = pushAdapter.configSchema.parse(
     decryptConfig((sourceRow.config ?? {}) as Record<string, unknown>),
   );
 
   let parsed: unknown;
   try {
-    parsed = await (sourceAdapter as PushSourceAdapter).parseWebhook(
-      config,
-      headers,
-      rawBody,
-    );
+    parsed = await pushAdapter.parseWebhook(config, headers, rawBody);
   } catch (e) {
     return c.json(
       { error: e instanceof Error ? e.message : "parse failed" },

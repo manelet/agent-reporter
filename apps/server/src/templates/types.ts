@@ -1,7 +1,4 @@
-export interface RenderedEmail {
-  subject: string;
-  html: string;
-}
+import type { Notification } from "@agent-reporter/shared";
 
 export interface ReportTemplate<TData = unknown> {
   id: string;
@@ -9,6 +6,5 @@ export interface ReportTemplate<TData = unknown> {
   sourceType: string;
   shouldDeliver(data: TData): boolean;
   mockData(): TData;
-  renderEmail(data: TData): RenderedEmail;
-  renderTelegram(data: TData): string;
+  render(data: TData): Notification;
 }

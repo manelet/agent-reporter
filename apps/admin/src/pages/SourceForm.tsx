@@ -7,9 +7,13 @@ import { PageHeader } from "../components/PageHeader.js";
 import { api } from "../lib/api.js";
 
 const supportedTypes: { value: SourceType; label: string }[] = [
-  { value: "custom-api", label: "Custom API (pull)" },
-  { value: "github-actions", label: "GitHub Actions (push)" },
-  { value: "sentry", label: "Sentry (pull)" },
+  { value: "custom-api", label: "Custom API (pull, emits Notification)" },
+  { value: "github-actions", label: "GitHub Actions (push, needs template)" },
+  {
+    value: "notification-webhook",
+    label: "Notification webhook (push, emits Notification)",
+  },
+  { value: "sentry", label: "Sentry (pull, needs template)" },
 ];
 
 type AnyConfig = Record<string, string>;
@@ -116,7 +120,7 @@ export function SourceFormPage() {
           <>
             <Field
               label="URL"
-              hint="Endpoint returning the standard JSON payload (title/sections/metrics)."
+              hint="Endpoint returning a Notification JSON payload (title + optional body/level/sections/metadata/links)."
             >
               <TextInput
                 type="url"
@@ -138,6 +142,15 @@ export function SourceFormPage() {
               />
             </Field>
           </>
+        ) : null}
+
+        {type === "notification-webhook" ? (
+          <p className="rounded border border-zinc-800 bg-zinc-900/40 p-3 text-xs text-zinc-400">
+            No source-level config. The webhook URL and HMAC secret are
+            generated per report when its trigger is set to webhook. POST a
+            Notification JSON body signed with
+            <code className="mx-1 text-zinc-300">X-Signature-256: sha256=…</code>.
+          </p>
         ) : null}
 
         {type === "github-actions" ? (

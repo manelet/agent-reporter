@@ -7,6 +7,7 @@ const navItems = [
   { to: "/channels", label: "Channels" },
   { to: "/runs", label: "Runs" },
   { to: "/templates", label: "Templates" },
+  { to: "/api-keys", label: "API keys" },
 ];
 
 export function Layout() {

@@ -1,10 +1,8 @@
-import { customApiPassthrough } from "./custom-api-passthrough.js";
 import { ghActionsWorkflowFailure } from "./gh-actions-workflow-failure.js";
 import { sentryDaily } from "./sentry-daily.js";
 import type { ReportTemplate } from "./types.js";
 
 export const templates: Record<string, ReportTemplate> = {
-  [customApiPassthrough.id]: customApiPassthrough as ReportTemplate,
   [ghActionsWorkflowFailure.id]: ghActionsWorkflowFailure as ReportTemplate,
   [sentryDaily.id]: sentryDaily as ReportTemplate,
 };

@@ -8,6 +8,47 @@ import {
 import { decrypt, encrypt } from "../crypto.js";
 import { executeReport } from "../runner.js";
 import { reloadSchedules } from "../scheduler.js";
+import { getSourceAdapter } from "../sources/index.js";
+import { getTemplate } from "../templates/index.js";
+import type PocketBase from "pocketbase";
+
+// Cross-validate template_id against the source's emitsNotification flag.
+// Sources that emit Notification directly must NOT have a template; sources
+// that don't must have one whose sourceType matches.
+async function validateTemplateForSource(
+  pb: PocketBase,
+  sourceId: string,
+  templateId: string | null | undefined,
+): Promise<void> {
+  const sourceRow = await pb.collection("sources").getOne(sourceId);
+  const adapter = getSourceAdapter(sourceRow.type);
+  if (adapter.emitsNotification) {
+    if (templateId) {
+      throw new HTTPException(400, {
+        message: `source "${adapter.type}" emits Notification directly; template_id must be empty`,
+      });
+    }
+    return;
+  }
+  if (!templateId) {
+    throw new HTTPException(400, {
+      message: `source "${adapter.type}" requires a template_id`,
+    });
+  }
+  let template;
+  try {
+    template = getTemplate(templateId);
+  } catch {
+    throw new HTTPException(400, {
+      message: `unknown template_id "${templateId}"`,
+    });
+  }
+  if (template.sourceType !== adapter.type) {
+    throw new HTTPException(400, {
+      message: `template "${template.id}" expects source type "${template.sourceType}" but source is "${adapter.type}"`,
+    });
+  }
+}
 
 const COLLECTION = "reports";
 
@@ -21,7 +62,7 @@ function shapeReport(row: Record<string, unknown>, opts: ShapeOpts = {}) {
     name: row.name,
     source: row.source,
     channels: row.channels ?? [],
-    template_id: row.template_id,
+    template_id: row.template_id || null,
     params: row.params ?? {},
     trigger: row.trigger,
     cron: row.cron || null,
@@ -68,11 +109,12 @@ export const reportsRoutes = new Hono()
       });
     }
     const data = parsed.data;
+    await validateTemplateForSource(pb, data.source, data.template_id ?? null);
     const create: Record<string, unknown> = {
       name: data.name,
       source: data.source,
       channels: data.channels,
-      template_id: data.template_id,
+      template_id: data.template_id ?? "",
       params: data.params,
       trigger: data.trigger,
       cron: data.cron ?? "",
@@ -101,6 +143,19 @@ export const reportsRoutes = new Hono()
     }
     const patch: Record<string, unknown> = { ...parsed.data };
     if ("cron" in patch && patch.cron === undefined) patch.cron = "";
+    if ("template_id" in patch && patch.template_id == null) {
+      patch.template_id = "";
+    }
+    // Re-validate template ↔ source whenever either changes.
+    if (patch.source !== undefined || "template_id" in patch) {
+      const current = await pb.collection(COLLECTION).getOne(id);
+      const sourceId = (patch.source as string | undefined) ?? current.source;
+      const templateId =
+        "template_id" in patch
+          ? ((patch.template_id as string | null) || null)
+          : ((current.template_id as string | null) || null);
+      await validateTemplateForSource(pb, sourceId, templateId);
+    }
     // Switching trigger to webhook on a report that didn't have one needs a
     // freshly generated secret.
     if (patch.trigger === "webhook") {

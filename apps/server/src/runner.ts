@@ -1,13 +1,14 @@
+import type { Notification } from "@agent-reporter/shared";
+import { notificationSchema } from "@agent-reporter/shared";
 import type PocketBase from "pocketbase";
 import { getChannelAdapter } from "./channels/index.js";
-import type { RenderedContent } from "./channels/types.js";
 import { decryptConfig } from "./crypto.js";
 import { getServerPb } from "./pb.js";
 import { getSourceAdapter } from "./sources/index.js";
 import type { TimeWindow } from "./sources/types.js";
 import { getTemplate } from "./templates/index.js";
 
-export type TriggerKind = "cron" | "webhook" | "manual";
+export type TriggerKind = "cron" | "webhook" | "manual" | "api";
 export type RunStatus = "success" | "partial" | "skipped" | "failed";
 
 interface DeliveryResult {
@@ -27,47 +28,20 @@ function last24hWindow(now = new Date()): TimeWindow {
 
 interface ResolvedReport {
   id: string;
-  template_id: string;
+  template_id: string | null;
   source: string;
   channels: string[];
   params: Record<string, unknown>;
   enabled: boolean;
 }
 
-// Shared post-fetch path: shouldDeliver → render → deliver → save run.
-async function deliverAndRecord(
+async function deliverToChannels(
   pb: PocketBase,
-  report: ResolvedReport,
-  triggerKind: TriggerKind,
-  startedAt: Date,
-  payload: unknown,
-): Promise<RunOutcome> {
-  const baseRun = {
-    report: report.id,
-    trigger_kind: triggerKind,
-    started_at: startedAt.toISOString(),
-  };
-  const template = getTemplate(report.template_id);
-
-  if (!template.shouldDeliver(payload)) {
-    const created = await pb.collection("runs").create({
-      ...baseRun,
-      status: "skipped",
-      finished_at: new Date().toISOString(),
-      payload,
-      rendered: null,
-      deliveries: [],
-    });
-    return { runId: created.id, status: "skipped" };
-  }
-
-  const rendered: RenderedContent = {
-    email: template.renderEmail(payload),
-    telegram: template.renderTelegram(payload),
-  };
-
+  channelIds: string[],
+  notification: Notification,
+): Promise<DeliveryResult[]> {
   const deliveries: DeliveryResult[] = [];
-  for (const channelId of report.channels) {
+  for (const channelId of channelIds) {
     try {
       const channelRow = await pb.collection("channels").getOne(channelId);
       const channelAdapter = getChannelAdapter(channelRow.type);
@@ -75,7 +49,7 @@ async function deliverAndRecord(
         (channelRow.config ?? {}) as Record<string, unknown>,
       );
       const config = channelAdapter.configSchema.parse(decrypted);
-      await channelAdapter.deliver(config, rendered);
+      await channelAdapter.deliver(config, notification);
       deliveries.push({ channel_id: channelId, status: "ok" });
     } catch (e) {
       deliveries.push({
@@ -85,21 +59,87 @@ async function deliverAndRecord(
       });
     }
   }
+  return deliveries;
+}
 
+function statusFromDeliveries(deliveries: DeliveryResult[]): RunStatus {
   const okCount = deliveries.filter((d) => d.status === "ok").length;
-  const status: RunStatus =
-    okCount === deliveries.length
-      ? "success"
-      : okCount === 0
-        ? "failed"
-        : "partial";
+  if (okCount === deliveries.length) return "success";
+  if (okCount === 0) return "failed";
+  return "partial";
+}
+
+// Shared post-payload path used by the cron/manual/webhook flows: convert
+// raw source payload to Notification (via template, or passthrough if the
+// source emits Notification directly), then deliver and record.
+async function deliverAndRecord(
+  pb: PocketBase,
+  report: ResolvedReport,
+  triggerKind: Exclude<TriggerKind, "api">,
+  startedAt: Date,
+  payload: unknown,
+  sourceEmitsNotification: boolean,
+): Promise<RunOutcome> {
+  const baseRun = {
+    report: report.id,
+    trigger_kind: triggerKind,
+    started_at: startedAt.toISOString(),
+  };
+
+  // Resolve template (if any) and decide shouldDeliver + Notification.
+  let shouldDeliver = true;
+  let notification: Notification;
+  try {
+    if (sourceEmitsNotification) {
+      // Payload is already a Notification (validated by the source adapter).
+      notification = notificationSchema.parse(payload);
+      // Implicit shouldDeliver: skip when title is empty (defensive only;
+      // the schema already requires title).
+      shouldDeliver = !!notification.title;
+    } else {
+      if (!report.template_id) {
+        throw new Error(
+          "report has no template but its source requires one",
+        );
+      }
+      const template = getTemplate(report.template_id);
+      shouldDeliver = template.shouldDeliver(payload);
+      notification = shouldDeliver
+        ? template.render(payload)
+        : ({ title: "" } as Notification);
+    }
+  } catch (e) {
+    return failRun(
+      pb,
+      report.id,
+      triggerKind,
+      startedAt,
+      payload,
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  if (!shouldDeliver) {
+    const created = await pb.collection("runs").create({
+      ...baseRun,
+      status: "skipped",
+      finished_at: new Date().toISOString(),
+      payload,
+      notification: null,
+      deliveries: [],
+    });
+    return { runId: created.id, status: "skipped" };
+  }
+
+  const deliveries = await deliverToChannels(pb, report.channels, notification);
+  const status = statusFromDeliveries(deliveries);
 
   const created = await pb.collection("runs").create({
     ...baseRun,
     status,
     finished_at: new Date().toISOString(),
     payload,
-    rendered,
+    notification,
     deliveries,
   });
   return { runId: created.id, status };
@@ -107,9 +147,10 @@ async function deliverAndRecord(
 
 async function failRun(
   pb: PocketBase,
-  reportId: string,
+  reportId: string | null,
   triggerKind: TriggerKind,
   startedAt: Date,
+  payload: unknown,
   error: string,
 ): Promise<RunOutcome> {
   const created = await pb.collection("runs").create({
@@ -118,6 +159,7 @@ async function failRun(
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
     status: "failed",
+    payload,
     deliveries: [],
     error,
   });
@@ -142,24 +184,51 @@ export async function executeReport(
 
   const sourceRow = await pb.collection("sources").getOne(report.source);
   const sourceAdapter = getSourceAdapter(sourceRow.type);
-  const template = getTemplate(report.template_id);
-  if (template.sourceType !== sourceAdapter.type) {
-    return failRun(
-      pb,
-      report.id,
-      triggerKind,
-      startedAt,
-      `template "${template.id}" expects source type "${template.sourceType}" but report uses "${sourceAdapter.type}"`,
-    );
-  }
   if (sourceAdapter.mode !== "pull") {
     return failRun(
       pb,
       report.id,
       triggerKind,
       startedAt,
+      null,
       `source "${sourceAdapter.type}" is push-mode; cannot run on cron/manual trigger`,
     );
+  }
+
+  // Cross-validate template <-> source.
+  if (sourceAdapter.emitsNotification) {
+    if (report.template_id) {
+      return failRun(
+        pb,
+        report.id,
+        triggerKind,
+        startedAt,
+        null,
+        `source "${sourceAdapter.type}" emits Notification directly; report must not have a template`,
+      );
+    }
+  } else {
+    if (!report.template_id) {
+      return failRun(
+        pb,
+        report.id,
+        triggerKind,
+        startedAt,
+        null,
+        `source "${sourceAdapter.type}" requires a template`,
+      );
+    }
+    const template = getTemplate(report.template_id);
+    if (template.sourceType !== sourceAdapter.type) {
+      return failRun(
+        pb,
+        report.id,
+        triggerKind,
+        startedAt,
+        null,
+        `template "${template.id}" expects source type "${template.sourceType}" but report uses "${sourceAdapter.type}"`,
+      );
+    }
   }
 
   let payload: unknown;
@@ -179,15 +248,23 @@ export async function executeReport(
       report.id,
       triggerKind,
       startedAt,
+      null,
       e instanceof Error ? e.message : String(e),
     );
   }
 
-  return deliverAndRecord(pb, report, triggerKind, startedAt, payload);
+  return deliverAndRecord(
+    pb,
+    report,
+    triggerKind,
+    startedAt,
+    payload,
+    sourceAdapter.emitsNotification,
+  );
 }
 
-// Push flow: webhook endpoint already verified the signature and parsed
-// the payload through the source adapter. We just need to deliver.
+// Push flow: the webhook endpoint already verified the HMAC signature and
+// parsed the payload through the source adapter. We just need to deliver.
 export async function executeWebhookReport(
   reportId: string,
   payload: unknown,
@@ -200,5 +277,42 @@ export async function executeWebhookReport(
     .collection("reports")
     .getOne(reportId)) as unknown as ResolvedReport;
 
-  return deliverAndRecord(pb, report, "webhook", startedAt, payload);
+  // We need the source to know whether the payload is already a Notification.
+  const sourceRow = await pb.collection("sources").getOne(report.source);
+  const sourceAdapter = getSourceAdapter(sourceRow.type);
+
+  return deliverAndRecord(
+    pb,
+    report,
+    "webhook",
+    startedAt,
+    payload,
+    sourceAdapter.emitsNotification,
+  );
+}
+
+// API flow: bearer-authenticated direct entrypoint. No report, no source —
+// the caller hands us a Notification and a list of channel ids.
+export async function executeApiNotification(
+  channelIds: string[],
+  notification: Notification,
+  pbOverride?: PocketBase,
+): Promise<RunOutcome> {
+  const pb = pbOverride ?? (await getServerPb());
+  const startedAt = new Date();
+
+  const deliveries = await deliverToChannels(pb, channelIds, notification);
+  const status = statusFromDeliveries(deliveries);
+
+  const created = await pb.collection("runs").create({
+    report: null,
+    trigger_kind: "api",
+    started_at: startedAt.toISOString(),
+    finished_at: new Date().toISOString(),
+    status,
+    payload: null,
+    notification,
+    deliveries,
+  });
+  return { runId: created.id, status };
 }

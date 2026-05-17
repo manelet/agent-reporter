@@ -5,10 +5,23 @@ import {
   sourceUpdateSchema,
 } from "@agent-reporter/shared";
 import { decryptConfig, encryptConfig, redactConfig } from "../crypto.js";
+import { sourceAdapters } from "../sources/index.js";
 
 const COLLECTION = "sources";
 
 export const sourcesRoutes = new Hono()
+  // Metadata about every registered source adapter. Used by the admin to
+  // know which form fields to show, whether to ask for a template, etc.
+  // Mounted before /:id so it doesn't get swallowed by the param route.
+  .get("/types", (c) =>
+    c.json(
+      Object.values(sourceAdapters).map((a) => ({
+        type: a.type,
+        mode: a.mode,
+        emitsNotification: a.emitsNotification,
+      })),
+    ),
+  )
   .get("/", async (c) => {
     const pb = c.get("pb");
     const list = await pb.collection(COLLECTION).getFullList({

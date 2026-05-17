@@ -42,20 +42,21 @@ export type GithubActionsWorkflowRunData = z.infer<
   typeof workflowRunEventSchema
 >;
 
-// Verifies the X-Hub-Signature-256 header that GitHub sends with each
-// webhook delivery. Constant-time comparison to avoid timing oracles.
-export function verifyGithubSignature(
+// Verifies a `<prefix>=<hex>` signature header (GitHub: sha256= prefix).
+// Constant-time comparison to avoid timing oracles.
+function verifyHmacHeader(
   rawBody: string,
   signatureHeader: string | undefined,
   secret: string,
+  prefix: string,
 ): boolean {
-  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+  if (!signatureHeader || !signatureHeader.startsWith(prefix)) return false;
   const expected = createHmac("sha256", secret)
     .update(rawBody, "utf8")
     .digest();
   let received: Buffer;
   try {
-    received = Buffer.from(signatureHeader.slice("sha256=".length), "hex");
+    received = Buffer.from(signatureHeader.slice(prefix.length), "hex");
   } catch {
     return false;
   }
@@ -69,7 +70,17 @@ export const githubActionsSource: PushSourceAdapter<
 > = {
   type: "github-actions",
   mode: "push",
+  emitsNotification: false,
   configSchema: githubActionsConfigSchema,
+
+  verifySignature(headers, rawBody, secret) {
+    return verifyHmacHeader(
+      rawBody,
+      headers["x-hub-signature-256"],
+      secret,
+      "sha256=",
+    );
+  },
 
   async parseWebhook(config, headers, rawBody) {
     // Only act on workflow_run events; ignore everything else GH might

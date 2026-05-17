@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout.js";
 import { RequireAuth } from "./components/RequireAuth.js";
+import { ApiKeysPage } from "./pages/ApiKeys.js";
 import { ChannelFormPage } from "./pages/ChannelForm.js";
 import { ChannelsPage } from "./pages/Channels.js";
 import { LoginPage } from "./pages/Login.js";
@@ -41,6 +42,7 @@ export default function App() {
           path="/templates/:id/preview"
           element={<TemplatePreviewPage />}
         />
+        <Route path="/api-keys" element={<ApiKeysPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/reports" replace />} />
     </Routes>

@@ -4,8 +4,10 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { env } from "./env.js";
 import { requireAuth } from "./auth.js";
+import { apiKeysRoutes } from "./api/api-keys.js";
 import { authRoutes } from "./api/auth.js";
 import { channelsRoutes } from "./api/channels.js";
+import { notifyRoutes } from "./api/notify.js";
 import { reportsRoutes } from "./api/reports.js";
 import { runsRoutes } from "./api/runs.js";
 import { sourcesRoutes } from "./api/sources.js";
@@ -32,7 +34,12 @@ app.get("/health", (c) => c.json({ ok: true }));
 // the handler using the report's own secret.
 app.route("/webhooks", webhooksRoutes);
 
+// Public auth endpoint (admin login).
 app.route("/api/auth", authRoutes);
+
+// Public direct-notification endpoint. Bearer = API key (not admin token).
+// Auth is handled inside the handler, not via the admin middleware.
+app.route("/api/notify", notifyRoutes);
 
 const protectedApi = new Hono();
 protectedApi.use("*", requireAuth);
@@ -41,6 +48,7 @@ protectedApi.route("/channels", channelsRoutes);
 protectedApi.route("/reports", reportsRoutes);
 protectedApi.route("/runs", runsRoutes);
 protectedApi.route("/templates", templatesRoutes);
+protectedApi.route("/api-keys", apiKeysRoutes);
 app.route("/api", protectedApi);
 
 app.onError((err, c) => {

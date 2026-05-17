@@ -49,7 +49,9 @@ export function RunDetailPage() {
               <dt className="text-zinc-500">Trigger</dt>
               <dd className="text-zinc-200">{q.data.trigger_kind}</dd>
               <dt className="text-zinc-500">Report</dt>
-              <dd className="font-mono text-xs text-zinc-300">{q.data.report}</dd>
+              <dd className="font-mono text-xs text-zinc-300">
+                {q.data.report ?? <span className="text-zinc-500">— (direct API call)</span>}
+              </dd>
               <dt className="text-zinc-500">Started</dt>
               <dd className="text-zinc-200">
                 {q.data.started_at
@@ -104,27 +106,12 @@ export function RunDetailPage() {
             </Section>
           ) : null}
 
-          {q.data.rendered ? (
-            <>
-              {q.data.rendered.email ? (
-                <Section
-                  title={`Rendered email: ${q.data.rendered.email.subject}`}
-                >
-                  <iframe
-                    title="email"
-                    srcDoc={q.data.rendered.email.html}
-                    className="h-80 w-full rounded border border-zinc-800 bg-white"
-                  />
-                </Section>
-              ) : null}
-              {q.data.rendered.telegram ? (
-                <Section title="Rendered telegram">
-                  <pre className="whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-200">
-                    {q.data.rendered.telegram}
-                  </pre>
-                </Section>
-              ) : null}
-            </>
+          {q.data.notification ? (
+            <Section title={`Notification: ${q.data.notification.title}`}>
+              <pre className="max-h-80 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
+                {JSON.stringify(q.data.notification, null, 2)}
+              </pre>
+            </Section>
           ) : null}
 
           <Section title="Raw payload">
