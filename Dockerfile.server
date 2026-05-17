@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1.6
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN corepack enable
+
+FROM base AS deps
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/admin/package.json ./apps/admin/
+COPY packages/shared/package.json ./packages/shared/
+RUN pnpm install --frozen-lockfile --filter @agent-reporter/server... --filter @agent-reporter/shared
+
+FROM base AS runtime
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV SERVER_HOST=0.0.0.0
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/server/node_modules ./apps/server/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY pnpm-workspace.yaml package.json ./
+COPY packages/shared ./packages/shared
+COPY apps/server ./apps/server
+WORKDIR /app/apps/server
+EXPOSE 3000
+CMD ["pnpm", "exec", "tsx", "src/index.ts"]
