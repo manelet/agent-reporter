@@ -9,6 +9,7 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/admin/package.json ./apps/admin/
 COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --frozen-lockfile --filter @agent-reporter/admin... --filter @agent-reporter/shared
+COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY apps/admin ./apps/admin
 WORKDIR /app/apps/admin
