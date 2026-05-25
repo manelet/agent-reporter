@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/admin/package.json ./apps/admin/
 COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install --frozen-lockfile --filter @agent-reporter/server... --filter @agent-reporter/shared
+RUN pnpm install --frozen-lockfile --filter @reporter/server... --filter @reporter/shared
 
 FROM base AS runtime
 ENV NODE_ENV=production
