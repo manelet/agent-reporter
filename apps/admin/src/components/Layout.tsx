@@ -2,12 +2,8 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken } from "../lib/auth.js";
 
 const navItems = [
-  { to: "/reports", label: "Reports" },
-  { to: "/sources", label: "Sources" },
-  { to: "/channels", label: "Channels" },
-  { to: "/runs", label: "Runs" },
-  { to: "/templates", label: "Templates" },
-  { to: "/api-keys", label: "API keys" },
+  { to: "/tokens", label: "Tokens" },
+  { to: "/logs", label: "Logs" },
 ];
 
 export function Layout() {

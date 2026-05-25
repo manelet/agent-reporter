@@ -15,11 +15,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      "/webhooks": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
     },
   },
 });

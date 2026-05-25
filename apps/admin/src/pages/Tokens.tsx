@@ -10,13 +10,13 @@ interface CreatedKey extends ApiKeyRecord {
   token: string;
 }
 
-export function ApiKeysPage() {
+export function TokensPage() {
   const qc = useQueryClient();
   const [revealed, setRevealed] = useState<CreatedKey | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const list = useQuery({
-    queryKey: ["api-keys"],
+    queryKey: ["tokens"],
     queryFn: () => api.get<ApiKeyRecord[]>("/api/api-keys"),
   });
 
@@ -25,7 +25,7 @@ export function ApiKeysPage() {
       api.post<CreatedKey>("/api/api-keys", { name: "global" }),
     onSuccess: (k) => {
       setRevealed(k);
-      qc.invalidateQueries({ queryKey: ["api-keys"] });
+      qc.invalidateQueries({ queryKey: ["tokens"] });
     },
     onError: (e) => setErr(e instanceof Error ? e.message : "create failed"),
   });
@@ -35,26 +35,26 @@ export function ApiKeysPage() {
       api.post<CreatedKey>(`/api/api-keys/${id}/rotate`, {}),
     onSuccess: (k) => {
       setRevealed(k);
-      qc.invalidateQueries({ queryKey: ["api-keys"] });
+      qc.invalidateQueries({ queryKey: ["tokens"] });
     },
     onError: (e) => setErr(e instanceof Error ? e.message : "rotate failed"),
   });
 
   const revoke = useMutation({
     mutationFn: (id: string) => api.post(`/api/api-keys/${id}/revoke`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tokens"] }),
     onError: (e) => setErr(e instanceof Error ? e.message : "revoke failed"),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => api.delete(`/api/api-keys/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tokens"] }),
   });
 
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title="API keys"
+        title="Tokens"
         actions={
           <Button
             variant="primary"
@@ -64,7 +64,7 @@ export function ApiKeysPage() {
             }}
             disabled={create.isPending}
           >
-            {create.isPending ? "Creating…" : "New API key"}
+            {create.isPending ? "Creating..." : "New token"}
           </Button>
         }
       />
@@ -105,12 +105,12 @@ export function ApiKeysPage() {
       {err ? <p className="mb-4 text-sm text-red-400">{err}</p> : null}
 
       {list.isLoading ? (
-        <p className="text-sm text-zinc-500">Loading…</p>
+        <p className="text-sm text-zinc-500">Loading...</p>
       ) : list.error ? (
         <p className="text-sm text-red-400">Failed to load.</p>
       ) : !list.data || list.data.length === 0 ? (
         <EmptyList
-          title="No API keys yet"
+          title="No tokens yet"
           hint="Create one to enable POST /api/notify from your scripts."
         />
       ) : (

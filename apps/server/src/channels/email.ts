@@ -1,57 +1,33 @@
 import { Resend } from "resend";
-import { z } from "zod";
+import { env } from "../env.js";
 import { renderEmail } from "./render.js";
 import type { ChannelAdapter } from "./types.js";
 
-const emailConfigSchema = z.object({
-  api_key: z.string().min(1),
-  from_address: z.string().email(),
-  to_addresses: z
-    .array(z.string().email())
-    .min(1, "at least one recipient")
-    .max(20),
-});
-
-export type EmailConfig = z.infer<typeof emailConfigSchema>;
-
-async function send(
-  config: EmailConfig,
-  subject: string,
-  html: string,
-): Promise<void> {
-  const resend = new Resend(config.api_key);
-  const { error } = await resend.emails.send({
-    from: config.from_address,
-    to: config.to_addresses,
-    subject,
-    html,
-  });
-  if (error) {
-    throw new Error(`resend ${error.name}: ${error.message}`);
-  }
-}
-
-export const emailChannel: ChannelAdapter<EmailConfig> = {
+export const emailChannel: ChannelAdapter = {
   type: "email",
-  configSchema: emailConfigSchema,
 
-  async deliver(config, notification) {
-    const { subject, html } = renderEmail(notification);
-    await send(config, subject, html);
-  },
-
-  async testDelivery(config) {
-    try {
-      await send(
-        config,
-        "agent-reporter test",
-        `<p>Test message from agent-reporter to ${config.to_addresses.join(
-          ", ",
-        )}.</p>`,
+  async deliver(notification, overrideTo) {
+    if (!env.RESEND_API_KEY || !env.RESEND_FROM_ADDRESS) {
+      throw new Error(
+        "Email channel not configured (missing RESEND_API_KEY or RESEND_FROM_ADDRESS)",
       );
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+    const to = overrideTo
+      ? overrideTo.split(",").map((e) => e.trim())
+      : env.RESEND_TO_ADDRESSES;
+    if (!to?.length) {
+      throw new Error("No email recipients configured");
+    }
+    const resend = new Resend(env.RESEND_API_KEY);
+    const { subject, html } = renderEmail(notification);
+    const { error } = await resend.emails.send({
+      from: env.RESEND_FROM_ADDRESS,
+      to,
+      subject,
+      html,
+    });
+    if (error) {
+      throw new Error(`resend ${error.name}: ${error.message}`);
     }
   },
 };

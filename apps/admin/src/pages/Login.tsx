@@ -25,7 +25,7 @@ export function LoginPage() {
         password,
       });
       setToken(res.token);
-      navigate("/reports");
+      navigate("/tokens");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "login failed");
     } finally {

@@ -3,14 +3,12 @@ import { apiNotifySchema } from "@agent-reporter/shared";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getServerPb } from "../pb.js";
-import { executeApiNotification } from "../runner.js";
+import { getChannelAdapter } from "../channels/index.js";
 
 function hashToken(plaintext: string): string {
   return createHash("sha256").update(plaintext).digest("hex");
 }
 
-// POST /api/notify — bearer-authenticated direct entrypoint. No source/no
-// report; the caller submits a Notification and a list of channel ids.
 export const notifyRoutes = new Hono().post("/", async (c) => {
   const auth = c.req.header("authorization");
   if (!auth?.startsWith("Bearer ")) {
@@ -45,7 +43,6 @@ export const notifyRoutes = new Hono().post("/", async (c) => {
     });
   }
 
-  // Best-effort update; failures here shouldn't block the delivery.
   void pb
     .collection("api_keys")
     .update(keyRow.id, { last_used_at: new Date().toISOString() })
@@ -53,17 +50,32 @@ export const notifyRoutes = new Hono().post("/", async (c) => {
       console.error("[notify] failed to update last_used_at", e);
     });
 
+  const { channel, notification, to } = parsed.data;
+  const adapter = getChannelAdapter(channel);
+  const recipient = to ?? null;
+
+  let status: "success" | "failed" = "success";
+  let error: string | null = null;
+
   try {
-    const outcome = await executeApiNotification(
-      parsed.data.channels,
-      parsed.data.notification,
-      pb,
-    );
-    return c.json(outcome);
+    await adapter.deliver(notification, to);
   } catch (e) {
-    console.error("[notify] delivery failed", e);
-    throw new HTTPException(500, {
-      message: e instanceof Error ? e.message : "delivery failed",
-    });
+    status = "failed";
+    error = e instanceof Error ? e.message : String(e);
+    console.error(`[notify] ${channel} delivery failed:`, error);
   }
+
+  const log = await pb.collection("notification_logs").create({
+    token_id: keyRow.id,
+    channel,
+    status,
+    notification,
+    recipient,
+    error,
+  });
+
+  if (status === "failed") {
+    return c.json({ id: log.id, status, error }, 502);
+  }
+  return c.json({ id: log.id, status });
 });

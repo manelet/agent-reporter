@@ -1,0 +1,18 @@
+{
+  "name": "@agent-reporter/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agent-reporter/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

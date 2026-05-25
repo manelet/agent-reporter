@@ -1,24 +1,18 @@
-import { z } from "zod";
+import { env } from "../env.js";
 import { renderTelegram } from "./render.js";
 import type { ChannelAdapter } from "./types.js";
 
-const telegramConfigSchema = z.object({
-  bot_token: z.string().min(1),
-  chat_id: z.string().min(1),
-});
-
-export type TelegramConfig = z.infer<typeof telegramConfigSchema>;
-
 async function sendMessage(
-  config: TelegramConfig,
+  botToken: string,
+  chatId: string,
   text: string,
 ): Promise<void> {
-  const url = `https://api.telegram.org/bot${config.bot_token}/sendMessage`;
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      chat_id: config.chat_id,
+      chat_id: chatId,
       text,
       parse_mode: "MarkdownV2",
       disable_web_page_preview: true,
@@ -30,24 +24,19 @@ async function sendMessage(
   }
 }
 
-export const telegramChannel: ChannelAdapter<TelegramConfig> = {
+export const telegramChannel: ChannelAdapter = {
   type: "telegram",
-  configSchema: telegramConfigSchema,
 
-  async deliver(config, notification) {
-    await sendMessage(config, renderTelegram(notification));
-  },
-
-  async testDelivery(config) {
-    try {
-      await sendMessage(config, renderTelegram({
-        title: "agent-reporter test",
-        body: "Delivery is working.",
-        level: "success",
-      }));
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  async deliver(notification, overrideTo) {
+    if (!env.TELEGRAM_BOT_TOKEN) {
+      throw new Error(
+        "Telegram channel not configured (missing TELEGRAM_BOT_TOKEN)",
+      );
     }
+    const chatId = overrideTo ?? env.TELEGRAM_CHAT_ID;
+    if (!chatId) {
+      throw new Error("No Telegram chat_id configured");
+    }
+    await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, renderTelegram(notification));
   },
 };
