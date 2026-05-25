@@ -12,8 +12,8 @@ export type {
 export type Channel = "telegram" | "email";
 
 export interface AgentReporterOptions {
-  baseUrl: string;
   token: string;
+  baseUrl?: string;
 }
 
 export interface NotifyParams {
@@ -33,7 +33,7 @@ export class AgentReporter {
   private token: string;
 
   constructor(opts: AgentReporterOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/$/, "");
+    this.baseUrl = (opts.baseUrl ?? "https://api.agent-reporter.localhost").replace(/\/$/, "");
     this.token = opts.token;
   }
 
