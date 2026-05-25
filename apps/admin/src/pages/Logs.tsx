@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { NotificationLogRecord } from "@agent-reporter/shared";
+import type { NotificationLogRecord } from "@reporter/shared";
 import { Button } from "../components/Field.js";
 import { EmptyList } from "../components/EmptyList.js";
 import { PageHeader } from "../components/PageHeader.js";

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { apiNotifySchema } from "@agent-reporter/shared";
+import { apiNotifySchema } from "@reporter/shared";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getServerPb } from "../pb.js";

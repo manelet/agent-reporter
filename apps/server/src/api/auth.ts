@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { loginSchema } from "@agent-reporter/shared";
+import { loginSchema } from "@reporter/shared";
 import { pb } from "../pb.js";
 
 export const authRoutes = new Hono().post("/login", async (c) => {

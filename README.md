@@ -1,4 +1,4 @@
-# agent-reporter
+# reporter
 
 Notification delivery service. Send notifications to Telegram and Email via a single authenticated endpoint or the SDK.
 
@@ -33,24 +33,24 @@ First run: open <http://127.0.0.1:8090/_/> to create the PocketBase superuser. T
 
 | Service    | URL                                   |
 |------------|---------------------------------------|
-| Admin SPA  | <https://agent-reporter.localhost>    |
-| Server API | <https://api.agent-reporter.localhost>|
+| Admin SPA  | <https://reporter.localhost>    |
+| Server API | <https://api.reporter.localhost>|
 | PocketBase | <http://127.0.0.1:8090>               |
 
-The admin proxies `/api` to the server, so `https://agent-reporter.localhost/api/...` works too.
+The admin proxies `/api` to the server, so `https://reporter.localhost/api/...` works too.
 
 ## Usage
 
 ### 1. Create a token
 
-Sign into the admin at <https://agent-reporter.localhost> and create a token on the **Tokens** page.
+Sign into the admin at <https://reporter.localhost> and create a token on the **Tokens** page.
 
 ### 2. Send a notification
 
 **Via curl:**
 
 ```bash
-curl -X POST https://api.agent-reporter.localhost/api/notify \
+curl -X POST https://api.reporter.localhost/api/notify \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -63,15 +63,16 @@ curl -X POST https://api.agent-reporter.localhost/api/notify \
   }'
 ```
 
-**Via SDK (`@agent-reporter/sdk`):**
+**Via SDK:**
+
+```bash
+pnpm add github:manelet/reporter --filter packages/sdk
+```
 
 ```typescript
-import { AgentReporter } from "@agent-reporter/sdk";
+import { Reporter } from "@reporter/sdk";
 
-const reporter = new AgentReporter({
-  baseUrl: "https://api.agent-reporter.localhost",
-  token: "<token>",
-});
+const reporter = new Reporter({ token: "<token>" });
 
 await reporter.notify({
   channel: "telegram",
@@ -161,7 +162,7 @@ apps/
   admin/           React + Vite SPA (token management, delivery logs)
 packages/
   shared/          Notification types, zod schemas
-  sdk/             SDK client (@agent-reporter/sdk)
+  sdk/             SDK client (@reporter/sdk)
 pb_migrations/     PocketBase schema (api_keys, notification_logs)
 ```
 

@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 // When running standalone (no portless) override via VITE_API_URL.
 const API_TARGET =
-  process.env.VITE_API_URL ?? "https://api.agent-reporter.localhost";
+  process.env.VITE_API_URL ?? "https://api.reporter.localhost";
 
 export default defineConfig({
   plugins: [react()],

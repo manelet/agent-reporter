@@ -20,7 +20,7 @@ importers:
 
   apps/admin:
     dependencies:
-      '@agent-reporter/shared':
+      '@reporter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tanstack/react-query':
@@ -66,12 +66,12 @@ importers:
 
   apps/server:
     dependencies:
-      '@agent-reporter/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@hono/node-server':
         specifier: ^1.13.7
         version: 1.19.14(hono@4.12.18)
+      '@reporter/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -102,10 +102,6 @@ importers:
         version: 5.9.3
 
   packages/sdk:
-    dependencies:
-      '@agent-reporter/shared':
-        specifier: workspace:*
-        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.6.3

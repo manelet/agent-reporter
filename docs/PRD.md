@@ -1,4 +1,4 @@
-# agent-reporter — PRD
+# reporter — PRD
 
 ## 1. Objetivo
 
@@ -32,10 +32,10 @@ notification_logs  ← PocketBase (SQLite)
 ### Monorepo
 
 ```
-apps/server        @agent-reporter/server
-apps/admin         @agent-reporter/admin
-packages/shared    @agent-reporter/shared
-packages/sdk       @agent-reporter/sdk
+apps/server        @reporter/server
+apps/admin         @reporter/admin
+packages/shared    @reporter/shared
+packages/sdk       @reporter/sdk
 ```
 
 ## 3. Funcionalidades
@@ -81,15 +81,16 @@ packages/sdk       @agent-reporter/sdk
 
 ### 3.2 SDK
 
-Paquete `@agent-reporter/sdk` — wrapper HTTP tipado.
+Paquete `@reporter/sdk` — wrapper HTTP tipado. Se instala desde el repo:
+
+```bash
+pnpm add github:manelet/reporter --filter packages/sdk
+```
 
 ```typescript
-import { AgentReporter } from "@agent-reporter/sdk";
+import { Reporter } from "@reporter/sdk";
 
-const reporter = new AgentReporter({
-  baseUrl: "https://api.agent-reporter.localhost",
-  token: "ar_...",
-});
+const reporter = new Reporter({ token: "ar_..." });
 
 await reporter.notify({
   channel: "telegram",
@@ -211,8 +212,8 @@ pnpm dev  # PocketBase + server (portless) + admin (portless)
 ```
 
 URLs:
-- Admin: `https://agent-reporter.localhost`
-- API: `https://api.agent-reporter.localhost`
+- Admin: `https://reporter.localhost`
+- API: `https://api.reporter.localhost`
 - PocketBase: `http://127.0.0.1:8090`
 
 ### Produccion

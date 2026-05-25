@@ -16,7 +16,7 @@ export function Layout() {
     <div className="flex min-h-full">
       <aside className="w-56 shrink-0 border-r border-zinc-800 bg-zinc-900/40 p-4">
         <div className="mb-6 text-sm font-semibold tracking-wide text-zinc-300">
-          agent-reporter
+          reporter
         </div>
         <nav className="flex flex-col gap-1 text-sm">
           {navItems.map((item) => (

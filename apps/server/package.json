@@ -1,9 +1,9 @@
 {
-  "name": "@agent-reporter/server",
+  "name": "@reporter/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "portless": { "name": "api.agent-reporter" },
+  "portless": { "name": "api.reporter" },
   "scripts": {
     "dev": "portless run tsx watch src/index.ts",
     "start": "node dist/index.js",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agent-reporter/shared": "workspace:*",
+    "@reporter/shared": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "dotenv": "^16.4.5",
     "hono": "^4.6.10",

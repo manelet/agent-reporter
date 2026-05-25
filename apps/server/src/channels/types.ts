@@ -1,4 +1,4 @@
-import type { Notification } from "@agent-reporter/shared";
+import type { Notification } from "@reporter/shared";
 
 export interface ChannelAdapter {
   type: string;

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { apiKeyCreateSchema } from "@agent-reporter/shared";
+import { apiKeyCreateSchema } from "@reporter/shared";
 
 const COLLECTION = "api_keys";
 

@@ -1,4 +1,4 @@
-import type { Notification } from "@agent-reporter/shared";
+import type { Notification } from "@reporter/shared";
 
 // Channel-side rendering. Producers never touch HTML or MarkdownV2 — they
 // emit a Notification and we convert here.

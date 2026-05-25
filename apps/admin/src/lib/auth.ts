@@ -1,4 +1,4 @@
-const TOKEN_KEY = "agent-reporter:token";
+const TOKEN_KEY = "reporter:token";
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);

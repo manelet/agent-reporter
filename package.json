@@ -1,12 +1,12 @@
 {
-  "name": "agent-reporter",
+  "name": "reporter",
   "private": true,
   "version": "0.0.0",
   "scripts": {
     "dev": "concurrently -k -n pb,apps \"pnpm dev:pb\" \"wait-on tcp:127.0.0.1:8090 && pnpm --parallel -r dev\"",
     "dev:pb": "pocketbase serve --http=127.0.0.1:8090",
-    "dev:server": "pnpm --filter @agent-reporter/server dev",
-    "dev:admin": "pnpm --filter @agent-reporter/admin dev",
+    "dev:server": "pnpm --filter @reporter/server dev",
+    "dev:admin": "pnpm --filter @reporter/admin dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },

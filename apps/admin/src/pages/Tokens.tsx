@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ApiKeyRecord } from "@agent-reporter/shared";
+import type { ApiKeyRecord } from "@reporter/shared";
 import { Button } from "../components/Field.js";
 import { EmptyList } from "../components/EmptyList.js";
 import { PageHeader } from "../components/PageHeader.js";

@@ -1,17 +1,38 @@
-import type { Notification } from "@agent-reporter/shared";
+export type NotificationLevel = "info" | "warn" | "error" | "success";
 
-export type { Notification } from "@agent-reporter/shared";
-export type {
-  NotificationLevel,
-  NotificationSection,
-  NotificationItem,
-  NotificationMetadata,
-  NotificationLink,
-} from "@agent-reporter/shared";
+export interface NotificationItem {
+  label: string;
+  value: string | number;
+  url?: string;
+}
+
+export interface NotificationSection {
+  heading: string;
+  items: NotificationItem[];
+}
+
+export interface NotificationMetadata {
+  key: string;
+  value: string | number;
+}
+
+export interface NotificationLink {
+  label: string;
+  url: string;
+}
+
+export interface Notification {
+  title: string;
+  body?: string;
+  level?: NotificationLevel;
+  sections?: NotificationSection[];
+  metadata?: NotificationMetadata[];
+  links?: NotificationLink[];
+}
 
 export type Channel = "telegram" | "email";
 
-export interface AgentReporterOptions {
+export interface ReporterOptions {
   token: string;
   baseUrl?: string;
 }
@@ -28,12 +49,12 @@ export interface NotifyResult {
   error?: string;
 }
 
-export class AgentReporter {
+export class Reporter {
   private baseUrl: string;
   private token: string;
 
-  constructor(opts: AgentReporterOptions) {
-    this.baseUrl = (opts.baseUrl ?? "https://api.agent-reporter.localhost").replace(/\/$/, "");
+  constructor(opts: ReporterOptions) {
+    this.baseUrl = (opts.baseUrl ?? "https://api.reporter.localhost").replace(/\/$/, "");
     this.token = opts.token;
   }
 
@@ -48,7 +69,7 @@ export class AgentReporter {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText);
-      throw new Error(`agent-reporter ${res.status}: ${text}`);
+      throw new Error(`reporter ${res.status}: ${text}`);
     }
     return res.json() as Promise<NotifyResult>;
   }
