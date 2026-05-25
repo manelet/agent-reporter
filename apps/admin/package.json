@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "portless": { "name": "reporter" },
+  "portless": { "name": "admin.reporter" },
   "scripts": {
     "dev": "portless run vite",
     "build": "tsc -b && vite build",

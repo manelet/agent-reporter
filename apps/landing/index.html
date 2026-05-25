@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>reporter</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #09090b;
+        color: #fafafa;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .container {
+        max-width: 480px;
+        padding: 2rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 2rem;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        margin-bottom: 1rem;
+      }
+      p {
+        color: #a1a1aa;
+        line-height: 1.6;
+        font-size: 1.05rem;
+      }
+      code {
+        background: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 4px;
+        padding: 0.15em 0.4em;
+        font-size: 0.9em;
+        color: #e4e4e7;
+      }
+      .links {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1.5rem;
+        justify-content: center;
+      }
+      a {
+        color: #a1a1aa;
+        text-decoration: none;
+        font-size: 0.875rem;
+        transition: color 0.15s;
+      }
+      a:hover { color: #fafafa; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>reporter</h1>
+      <p>
+        Notification delivery service. Send notifications to Telegram and Email
+        via a single <code>POST /api/notify</code> endpoint.
+      </p>
+      <div class="links">
+        <a href="https://admin.reporter.localhost">Admin</a>
+        <a href="https://api.reporter.localhost/health">API</a>
+        <a href="https://github.com/manelet/reporter">GitHub</a>
+      </div>
+    </div>
+  </body>
+</html>

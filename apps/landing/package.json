@@ -1,0 +1,16 @@
+{
+  "name": "@reporter/landing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "portless": { "name": "reporter" },
+  "scripts": {
+    "dev": "portless run vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "portless": "^0.11.1",
+    "vite": "^5.4.11"
+  }
+}

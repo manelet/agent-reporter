@@ -212,7 +212,8 @@ pnpm dev  # PocketBase + server (portless) + admin (portless)
 ```
 
 URLs:
-- Admin: `https://reporter.localhost`
+- Landing: `https://reporter.localhost`
+- Admin: `https://admin.reporter.localhost`
 - API: `https://api.reporter.localhost`
 - PocketBase: `http://127.0.0.1:8090`
 

@@ -12,7 +12,7 @@ const envSchema = z.object({
   PB_ADMIN_PASSWORD: z.string().min(1),
   PORT: z.coerce.number().int().positive().default(3000),
   SERVER_HOST: z.string().default("127.0.0.1"),
-  ADMIN_ORIGIN: z.string().url().default("https://reporter.localhost"),
+  ADMIN_ORIGIN: z.string().url().default("https://admin.reporter.localhost"),
 
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_ADDRESS: z.string().email().optional(),

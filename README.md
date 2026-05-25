@@ -31,19 +31,20 @@ First run: open <http://127.0.0.1:8090/_/> to create the PocketBase superuser. T
 
 ## URLs (dev)
 
-| Service    | URL                                   |
-|------------|---------------------------------------|
-| Admin SPA  | <https://reporter.localhost>    |
-| Server API | <https://api.reporter.localhost>|
-| PocketBase | <http://127.0.0.1:8090>               |
+| Service    | URL                                         |
+|------------|---------------------------------------------|
+| Landing    | <https://reporter.localhost>                 |
+| Admin SPA  | <https://admin.reporter.localhost>           |
+| Server API | <https://api.reporter.localhost>             |
+| PocketBase | <http://127.0.0.1:8090>                      |
 
-The admin proxies `/api` to the server, so `https://reporter.localhost/api/...` works too.
+The admin proxies `/api` to the server, so `https://admin.reporter.localhost/api/...` works too.
 
 ## Usage
 
 ### 1. Create a token
 
-Sign into the admin at <https://reporter.localhost> and create a token on the **Tokens** page.
+Sign into the admin at <https://admin.reporter.localhost> and create a token on the **Tokens** page.
 
 ### 2. Send a notification
 
@@ -160,6 +161,7 @@ Channels are configured via environment variables. Leave empty to disable a chan
 apps/
   server/          Hono HTTP server (notify endpoint, token CRUD, logs)
   admin/           React + Vite SPA (token management, delivery logs)
+  landing/         Static landing page
 packages/
   shared/          Notification types, zod schemas
   sdk/             SDK client (@reporter/sdk)

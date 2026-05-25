@@ -11,7 +11,7 @@ services:
       - PB_URL=${PB_URL:?}
       - PB_ADMIN_EMAIL=${PB_ADMIN_EMAIL:?}
       - PB_ADMIN_PASSWORD=${PB_ADMIN_PASSWORD:?}
-      - ADMIN_ORIGIN=${ADMIN_ORIGIN:?}
+      - ADMIN_ORIGIN=${ADMIN_ORIGIN:-https://admin.reporter.localhost}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_FROM_ADDRESS=${RESEND_FROM_ADDRESS:-}
       - RESEND_TO_ADDRESSES=${RESEND_TO_ADDRESSES:-}
