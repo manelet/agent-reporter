@@ -60,7 +60,7 @@ export const webhookRoutes = new Hono().post("/:integrationId", async (c) => {
   }
 
   const notification = applyTemplate(template, body);
-  const recipient = integration.to ?? undefined;
+  const recipient = integration.to || undefined;
   const results: { id: string; channel: string; status: string; error?: string }[] = [];
 
   for (const ch of integration.channels) {
