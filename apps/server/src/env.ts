@@ -26,6 +26,8 @@ const envSchema = z.object({
   TELEGRAM_CHAT_ID: z.string().min(1).optional(),
 });
 
+console.log("[env] TELEGRAM_BOT_TOKEN set:", !!process.env.TELEGRAM_BOT_TOKEN);
+console.log("[env] TELEGRAM_CHAT_ID set:", !!process.env.TELEGRAM_CHAT_ID);
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   console.error("Invalid environment variables:");

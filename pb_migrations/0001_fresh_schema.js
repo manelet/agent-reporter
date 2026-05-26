@@ -34,6 +34,12 @@ migrate(
     }
 
     // notification_logs — delivery log for every /api/notify call.
+    try {
+      app.findCollectionByNameOrId("notification_logs");
+      return; // Already exists — skip.
+    } catch {
+      // Doesn't exist — create it.
+    }
     const apiKeys = app.findCollectionByNameOrId("api_keys");
     const logs = new Collection({
       type: "base",

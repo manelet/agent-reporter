@@ -37,7 +37,11 @@ export const webhookRoutes = new Hono().post("/:integrationId", async (c) => {
 
   let body: unknown;
   try {
-    body = JSON.parse(rawBody);
+    const contentType = headers["content-type"] ?? "";
+    const jsonSource = contentType.includes("application/x-www-form-urlencoded")
+      ? new URLSearchParams(rawBody).get("payload") ?? rawBody
+      : rawBody;
+    body = JSON.parse(jsonSource);
   } catch {
     throw new HTTPException(400, { message: "invalid json body" });
   }
