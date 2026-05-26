@@ -3,6 +3,7 @@ import { clearToken } from "../lib/auth.js";
 
 const navItems = [
   { to: "/tokens", label: "Tokens" },
+  { to: "/integrations", label: "Integrations" },
   { to: "/logs", label: "Logs" },
 ];
 

@@ -8,6 +8,8 @@ import { apiKeysRoutes } from "./api/api-keys.js";
 import { authRoutes } from "./api/auth.js";
 import { notifyRoutes } from "./api/notify.js";
 import { notificationLogsRoutes } from "./api/notification-logs.js";
+import { webhookRoutes } from "./api/webhook.js";
+import { integrationsRoutes } from "./api/integrations.js";
 
 const app = new Hono();
 
@@ -26,11 +28,13 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 app.route("/api/auth", authRoutes);
 app.route("/api/notify", notifyRoutes);
+app.route("/api/webhook", webhookRoutes);
 
 const protectedApi = new Hono();
 protectedApi.use("*", requireAuth);
 protectedApi.route("/api-keys", apiKeysRoutes);
 protectedApi.route("/notification-logs", notificationLogsRoutes);
+protectedApi.route("/integrations", integrationsRoutes);
 app.route("/api", protectedApi);
 
 app.onError((err, c) => {
