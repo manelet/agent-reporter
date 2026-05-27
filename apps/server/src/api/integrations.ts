@@ -23,7 +23,7 @@ export const integrationsRoutes = new Hono()
       });
     }
 
-    const { name, provider: providerType, channels, to, secret } = parsed.data;
+    const { name, provider: providerType, channels, to, secret, filters } = parsed.data;
     const provider = getProvider(providerType);
 
     const pb = await getServerPb();
@@ -34,6 +34,7 @@ export const integrationsRoutes = new Hono()
       to: to ?? null,
       secret: secret ?? null,
       templates: provider.defaultTemplates,
+      filters: filters ?? {},
       enabled: true,
     });
 
