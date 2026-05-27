@@ -51,6 +51,14 @@ export const webhookRoutes = new Hono().post("/:integrationId", async (c) => {
     throw new HTTPException(400, { message: "unable to determine event type" });
   }
 
+  const allowedActions = integration.filters?.[eventType];
+  if (allowedActions && allowedActions.length > 0) {
+    const action = (body as Record<string, unknown>)?.action;
+    if (typeof action === "string" && !allowedActions.includes(action)) {
+      return c.json({ status: "skipped", event: eventType, action, reason: "filtered" }, 200);
+    }
+  }
+
   const template =
     integration.templates[eventType] ??
     provider.defaultTemplates[eventType];

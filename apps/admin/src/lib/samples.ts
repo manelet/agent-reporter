@@ -5,6 +5,14 @@ export const providerEventTypes: Record<string, string[]> = {
   mixpanel: ["alert", "custom-alert"],
 };
 
+export const providerEventActions: Record<string, Record<string, string[]>> = {
+  github: {
+    pull_request: ["opened", "closed", "synchronize", "reopened", "edited"],
+    issues: ["opened", "closed", "reopened", "labeled", "edited"],
+    workflow_run: ["requested", "in_progress", "completed"],
+  },
+};
+
 export const samplePayloads: Record<string, Record<string, unknown>> = {
   "github:push": {
     ref: "refs/heads/main",

@@ -40,6 +40,7 @@ export interface IntegrationRecord extends BaseRecord {
   channels: ChannelType[];
   to: string | null;
   templates: Record<string, NotificationTemplate>;
+  filters: Record<string, string[]>;
   secret: string | null;
   enabled: boolean;
 }

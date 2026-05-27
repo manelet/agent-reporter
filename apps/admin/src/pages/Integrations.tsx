@@ -9,6 +9,7 @@ import { api } from "../lib/api.js";
 import { applyTemplate } from "../lib/template.js";
 import {
   providerEventTypes,
+  providerEventActions,
   samplePayloads,
   defaultTemplates,
 } from "../lib/samples.js";
@@ -141,10 +142,12 @@ export function IntegrationsPage() {
   const [template, setTemplate] = useState<NotificationTemplate>(
     defaultTemplates.github!.push!,
   );
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
 
   // Edit-mode state
   const [editEventType, setEditEventType] = useState("");
   const [editTemplate, setEditTemplate] = useState<NotificationTemplate | null>(null);
+  const [editFilters, setEditFilters] = useState<Record<string, string[]>>({});
 
   const list = useQuery({
     queryKey: ["integrations"],
@@ -153,14 +156,16 @@ export function IntegrationsPage() {
 
   const create = useMutation({
     mutationFn: () => {
-      const allTemplates = { ...defaultTemplates[provider] };
-      allTemplates[eventType] = template;
+      const nonEmptyFilters = Object.fromEntries(
+        Object.entries(filters).filter(([, v]) => v.length > 0),
+      );
       return api.post<IntegrationRecord>("/api/integrations", {
         name,
         provider,
         channels,
         ...(to ? { to } : {}),
         ...(secret ? { secret } : {}),
+        ...(Object.keys(nonEmptyFilters).length > 0 ? { filters: nonEmptyFilters } : {}),
       });
     },
     onSuccess: async (record) => {
@@ -185,8 +190,8 @@ export function IntegrationsPage() {
   });
 
   const updateTemplates = useMutation({
-    mutationFn: ({ id, templates }: { id: string; templates: Record<string, NotificationTemplate> }) =>
-      api.patch(`/api/integrations/${id}`, { templates }),
+    mutationFn: ({ id, templates, filters: f }: { id: string; templates: Record<string, NotificationTemplate>; filters?: Record<string, string[]> }) =>
+      api.patch(`/api/integrations/${id}`, { templates, ...(f ? { filters: f } : {}) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["integrations"] });
       setMode("list");
@@ -204,9 +209,11 @@ export function IntegrationsPage() {
     setTo("");
     setSecret("");
     setTemplate(defaultTemplates.github!.push!);
+    setFilters({});
     setErr(null);
     setEditingIntegration(null);
     setEditTemplate(null);
+    setEditFilters({});
   }
 
   function onProviderChange(p: string) {
@@ -216,12 +223,23 @@ export function IntegrationsPage() {
     setEventType(firstEvent);
     const t = defaultTemplates[p]?.[firstEvent];
     setTemplate(t ?? { title: "" });
+    setFilters({});
   }
 
   function onEventTypeChange(et: string) {
     setEventType(et);
     const t = defaultTemplates[provider]?.[et];
     setTemplate(t ?? { title: "" });
+  }
+
+  function toggleFilter(event: string, action: string) {
+    setFilters((prev) => {
+      const current = prev[event] ?? [];
+      const next = current.includes(action)
+        ? current.filter((a) => a !== action)
+        : [...current, action];
+      return { ...prev, [event]: next };
+    });
   }
 
   function toggleChannel(ch: ChannelType) {
@@ -236,6 +254,7 @@ export function IntegrationsPage() {
     const first = events[0] ?? "";
     setEditEventType(first);
     setEditTemplate(intg.templates[first] ?? defaultTemplates[intg.provider]?.[first] ?? null);
+    setEditFilters(intg.filters ?? {});
     setErr(null);
     setMode("edit");
   }
@@ -250,10 +269,23 @@ export function IntegrationsPage() {
     );
   }
 
+  function toggleEditFilter(event: string, action: string) {
+    setEditFilters((prev) => {
+      const current = prev[event] ?? [];
+      const next = current.includes(action)
+        ? current.filter((a) => a !== action)
+        : [...current, action];
+      return { ...prev, [event]: next };
+    });
+  }
+
   function saveEdit() {
     if (!editingIntegration || !editTemplate) return;
     const templates = { ...editingIntegration.templates, [editEventType]: editTemplate };
-    updateTemplates.mutate({ id: editingIntegration.id, templates });
+    const cleanFilters = Object.fromEntries(
+      Object.entries(editFilters).filter(([, v]) => v.length > 0),
+    );
+    updateTemplates.mutate({ id: editingIntegration.id, templates, filters: cleanFilters });
   }
 
   const webhookBase = window.location.origin.replace("admin.", "api.");
@@ -303,6 +335,29 @@ export function IntegrationsPage() {
                 ))}
               </Select>
             </Field>
+
+            {(() => {
+              const actions = providerEventActions[provider]?.[eventType];
+              if (!actions) return null;
+              const selected = filters[eventType] ?? [];
+              return (
+                <Field label="Filter by action" hint="Only notify for selected actions. Leave empty to receive all.">
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    {actions.map((action) => (
+                      <label key={action} className="flex items-center gap-2 text-sm text-zinc-300">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(action)}
+                          onChange={() => toggleFilter(eventType, action)}
+                          className="accent-emerald-500"
+                        />
+                        {action}
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+              );
+            })()}
 
             <Field label="Recipient (optional)" hint="Override default. Chat ID for Telegram, email for Email.">
               <TextInput value={to} onChange={(e) => setTo(e.target.value)} />
@@ -361,7 +416,7 @@ export function IntegrationsPage() {
         />
         {err ? <p className="mb-4 text-sm text-red-400">{err}</p> : null}
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col gap-4">
           <Field label="Event type">
             <Select value={editEventType} onChange={(e) => onEditEventChange(e.target.value)}>
               {events.map((et) => (
@@ -369,6 +424,29 @@ export function IntegrationsPage() {
               ))}
             </Select>
           </Field>
+
+          {(() => {
+            const actions = providerEventActions[editingIntegration.provider]?.[editEventType];
+            if (!actions) return null;
+            const selected = editFilters[editEventType] ?? [];
+            return (
+              <Field label="Filter by action" hint="Only notify for selected actions. Leave empty to receive all.">
+                <div className="flex flex-wrap gap-3 pt-1">
+                  {actions.map((action) => (
+                    <label key={action} className="flex items-center gap-2 text-sm text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(action)}
+                        onChange={() => toggleEditFilter(editEventType, action)}
+                        className="accent-emerald-500"
+                      />
+                      {action}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            );
+          })()}
         </div>
 
         <div className="grid grid-cols-2 gap-8">

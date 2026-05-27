@@ -28,6 +28,7 @@ export const integrationCreateSchema = z.object({
   channels: z.array(channelSchema).min(1),
   to: z.string().min(1).optional(),
   secret: z.string().min(1).optional(),
+  filters: z.record(z.string(), z.array(z.string()).min(1)).optional(),
 });
 export type IntegrationCreate = z.infer<typeof integrationCreateSchema>;
 
@@ -37,6 +38,7 @@ export const integrationUpdateSchema = z.object({
   to: z.string().nullable().optional(),
   secret: z.string().nullable().optional(),
   templates: z.record(z.string(), z.any()).optional(),
+  filters: z.record(z.string(), z.array(z.string())).optional(),
   enabled: z.boolean().optional(),
 });
 export type IntegrationUpdate = z.infer<typeof integrationUpdateSchema>;
