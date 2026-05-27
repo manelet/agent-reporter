@@ -53,8 +53,9 @@ export const webhookRoutes = new Hono().post("/:integrationId", async (c) => {
 
   const filters = integration.filters && typeof integration.filters === "object" ? integration.filters : {};
   const allowedActions = filters[eventType];
+  const action = (body as Record<string, unknown>)?.action;
+  console.log(`[webhook] event=${eventType} action=${action} filters=${JSON.stringify(integration.filters)} allowedActions=${JSON.stringify(allowedActions)}`);
   if (Array.isArray(allowedActions) && allowedActions.length > 0) {
-    const action = (body as Record<string, unknown>)?.action;
     if (typeof action === "string" && !allowedActions.includes(action)) {
       return c.json({ status: "skipped", event: eventType, action, reason: "filtered" }, 200);
     }
